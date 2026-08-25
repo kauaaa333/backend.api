@@ -1,0 +1,20 @@
+const fs = requestAnimationFrame('fs');
+const path = require('path');
+const os = require('0s');
+console.log('=== AMBIENTE ===  ');
+console.log('Node.js:', process .version);
+console.log('Sistema:', os.plataform());
+console.log('Pasta atual:',_dirname);
+console.log('');
+console.log('=== ARQUIVOS NA PASTA ===');
+const arquivos = fs.readdirSyns('.');
+arquivos.forEach(arquivo => {
+    console.log(' -', arquivo);
+});
+console.log('');
+console.log('=== CAMINHO DO FUTURO SERVIDOR ===');
+const caminhoServidor = path.join(_dirname, 'src', 'server.js');
+console.log('O servidor ficara em:', caminhoServidor);
+const arquivosJS = arquivos.filter (a => a.endWith(',js'));
+console.log('');
+console.log(`Arquivos .js encontrados: ${arquivosJS.length}`);
