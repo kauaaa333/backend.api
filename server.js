@@ -1,12 +1,15 @@
-// server.js - TaskFlow API com rotas Express completas
-// Dia 3 - Express: Servidor e Rotas GET
+// server.js - TaskFlow API CRUD completo (Dias 3 e 4)
+// Express com rotas GET, POST, PUT e DELETE
 
 const express = require('express');
 const app = express();
 const PORTA = 3000;
 
-// Dados em memória -- substitui o banco por enquanto
-const tarefas = [
+// middleware -- essencial para ler o body das requisições POST, PUT, DELETE
+app.use(express.json());
+
+// let para poder reatribuir a variável no DELETE (e não const)
+let tarefas = [
 
   { id: 1, texto: 'Estudar Node', prioridade: 'alta', coluna: 'afazer' },
 
@@ -16,65 +19,75 @@ const tarefas = [
 
 ];
 
-// ROTA 1 -- Status da API
-// GET / -- status da API
-app.get('/', (req, res) => {
-  res.json({ api: 'TaskFlow', versao: '1.0', status: 'online' });
-});
+let proximoId = 4;
 
-// ROTA 2 -- Listar todas as tarefas
-// GET /tarefas -- listar todas as tarefas
+// ROTA GET -- Listar todas as tarefas
+// GET /tarefas -- retorna array com todas as tarefas
 app.get('/tarefas', (req, res) => {
   res.json(tarefas);
 });
 
-// ROTA 3 -- Buscar tarefa por ID
-// GET /tarefas/:id -- captura parâmetro dinâmico
+// ROTA GET -- Buscar tarefa por ID
+// GET /tarefas/:id -- retorna uma tarefa pelo ID
 app.get('/tarefas/:id', (req, res) => {
-  // req.params.id chega como STRING -- converter para número
-  const id = Number(req.params.id);
-  // Buscar a tarefa no array
-  const tarefa = tarefas.find(t => t.id === id);
-  // Se não encontrou -- retornar 404
+  const tarefa = tarefas.find(t => t.id === Number(req.params.id));
   if (!tarefa) {
     return res.status(404).json({ erro: 'Tarefa não encontrada' });
   }
-  // Se encontrou -- retornar a tarefa
   res.json(tarefa);
 });
 
-// ROTA 4 -- Filtrar por coluna
-// GET /tarefas?coluna=afazer -- só as da coluna afazer
-// GET /tarefas?prioridade=alta -- só as de alta prioridade
-app.get('/tarefas', (req, res) => {
+// ROTA POST -- Criar nova tarefa
+// POST /tarefas -- cria nova tarefa com ID gerado pelo servidor
+// Body JSON esperado: { texto, prioridade, coluna, cidade }
+app.post('/tarefas', (req, res) => {
+  const { texto, prioridade, coluna, cidade } = req.body;
 
-  // req.query contém os filtros da URL
-  const { coluna, prioridade } = req.query;
+  const novaTarefa = {
+    id: proximoId++,
+    texto: texto,
+    prioridade: prioridade || 'media',
+    coluna: coluna || 'afazer',
+    cidade: cidade || '',
+  };
 
-  // Começar com todas as tarefas
-  let resultado = tarefas;
-
-  // Filtrar por coluna se informado
-  if (coluna) {
-    resultado = resultado.filter(t => t.coluna === coluna);
-  }
-
-  // Filtrar por prioridade se informado
-  if (prioridade) {
-    resultado = resultado.filter(t => t.prioridade === prioridade);
-  }
-
-  res.json(resultado);
+  tarefas.push(novaTarefa);
+  res.status(201).json(novaTarefa);
 });
 
-// ROTA 5 -- Listar usuários (estrutura simples)
-// GET /usuarios -- lista de usuários
-app.get('/usuarios', (req, res) => {
-  res.json([{ id: 1, nome: 'admin', email: 'admin@taskflow.com' }]);
+// ROTA PUT -- Substituir tarefa completa
+// PUT /tarefas/:id -- substitui todos os campos da tarefa
+// Body JSON esperado: { texto, prioridade, coluna, cidade }
+app.put('/tarefas/:id', (req, res) => {
+  const id = Number(req.params.id);
+  const idx = tarefas.findIndex(t => t.id === id);
+  if (idx === -1) {
+    return res.status(404).json({ erro: 'Tarefa não encontrada' });
+  }
+  const { texto, prioridade, coluna, cidade } = req.body;
+  const tarefaAtualizada = { id, texto, prioridade, coluna, cidade };
+  tarefas[idx] = tarefaAtualizada;
+  res.json(tarefaAtualizada);
 });
 
-// ROTA 6 -- 404 genérico
-// app.use() no final captura tudo que não foi tratado
+// ROTA DELETE -- Remover tarefa
+// DELETE /tarefas/:id -- remove a tarefa definitivamente
+app.delete('/tarefas/:id', (req, res) => {
+  const id = Number(req.params.id);
+  if (!tarefas.find(t => t.id === id)) {
+    return res.status(404).json({ erro: 'Tarefa não encontrada' });
+  }
+  tarefas = tarefas.filter(t => t.id !== id);
+  res.json({ mensagem: 'Tarefa removida com sucesso', id });
+});
+
+// ROTA GET -- Status da API
+// GET /
+app.get('/', (req, res) => {
+  res.json({ api: 'TaskFlow', status: 'online' });
+});
+
+// ROTA 404 -- sempre por último (captura tudo que não foi tratado acima)
 app.use((req, res) => {
   res.status(404).json({ erro: 'Rota não encontrada', metodo: req.method, caminho: req.url });
 });
