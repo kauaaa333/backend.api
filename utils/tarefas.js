@@ -8,7 +8,7 @@ function listarTodas() {
 }
 
 function buscarPorId(id) {
-  return tarefas.find(t => t.id === id);
+  return tarefas.find((t) => t.id === id);
 }
 
 function adicionar(tarefa) {
@@ -17,7 +17,7 @@ function adicionar(tarefa) {
 }
 
 function remover(id) {
-  const index = tarefas.findIndex(t => t.id === id);
+  const index = tarefas.findIndex((t) => t.id === id);
   if (index !== -1) {
     return tarefas.splice(index, 1)[0];
   }

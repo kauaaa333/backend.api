@@ -14,6 +14,9 @@ app.use('/usuarios', require('./src/routes/usuarios.routes'));
 // Rotas de estatisticas
 app.use('/estatisticas', require('./src/routes/estatisticas.routes'));
 
+// Rotas de projetos
+app.use('/projetos', require('./src/routes/projetos.routes'));
+
 // Rota 404 -- sempre por ultimo (captura tudo que nao foi tratado acima)
 app.use((req, res) => {
   res.status(404).json({ erro: 'Rota nao encontrada', metodo: req.method, caminho: req.url });
