@@ -1,9 +1,30 @@
-const usuarios = [{ id: 1, nome: 'admin', email: 'admin@taskflow.com', senha: '1234' }];
-let proximoId = 2;
-function listar() { return usuarios; }
-function buscarPorId(id) { return usuarios.find((usuario) => usuario.id === id); }
-function buscarPorEmail(email) { return usuarios.find((usuario) => usuario.email.toLowerCase() === email.toLowerCase()); }
-function adicionar({ nome, email, senha }) { const usuario = { id: proximoId++, nome, email, senha }; usuarios.push(usuario); return usuario; }
-function atualizar(id, { nome, email, senha }) { const indice = usuarios.findIndex((usuario) => usuario.id === id); if (indice === -1) return null; const usuario = { id, nome, email, senha }; usuarios[indice] = usuario; return usuario; }
-function remover(id) { const indice = usuarios.findIndex((usuario) => usuario.id === id); return indice === -1 ? null : usuarios.splice(indice, 1)[0]; }
-module.exports = { listar, buscarPorId, buscarPorEmail, adicionar, atualizar, remover };
+let usuarios = [
+  { id: 1, nome: 'Ana', email: 'ana@email.com' },
+  { id: 2, nome: 'Bruno', email: 'bruno@email.com' },
+];
+
+let proximoId = 3;
+
+module.exports = {
+  listar: () => usuarios,
+  buscar: (id) => usuarios.find((u) => u.id === id),
+  buscarPorId: (id) => usuarios.find((u) => u.id === id),
+  buscarPorEmail: (email) => (email ? usuarios.find((u) => u.email.toLowerCase() === email.toLowerCase().trim()) : undefined),
+  adicionar: ({ nome, email, senha }) => {
+    const novo = { id: proximoId++, nome, email };
+    if (senha) novo.senha = senha;
+    usuarios.push(novo);
+    return novo;
+  },
+  atualizar: (id, dados) => {
+    const idx = usuarios.findIndex((u) => u.id === id);
+    if (idx === -1) return null;
+    usuarios[idx] = { ...usuarios[idx], ...dados, id };
+    return usuarios[idx];
+  },
+  remover: (id) => {
+    const idx = usuarios.findIndex((u) => u.id === id);
+    if (idx === -1) return null;
+    return usuarios.splice(idx, 1)[0];
+  },
+};

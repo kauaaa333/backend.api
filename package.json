@@ -1,15 +1,7 @@
 {
-  "devDependencies": {
-    "nodemon": "^3.1.14"
-  },
-  "dependencies": {
-    "cors": "^2.8.6",
-    "dotenv": "^17.4.2",
-    "express": "^5.2.1"
-  },
   "name": "backend.api",
   "version": "1.0.0",
-  "main": "globals.js",
+  "main": "server.js",
   "scripts": {
     "test": "node --test",
     "dev": "nodemon server.js",
@@ -18,5 +10,13 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": ""
+  "description": "",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
 }

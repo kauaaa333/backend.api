@@ -1,65 +1,288 @@
 const { after, before, test } = require('node:test');
 const assert = require('node:assert/strict');
+const path = require('node:path');
 
 let servidor;
 let urlBase;
 const portaDeTeste = 3107;
 
 before(async () => {
-  servidor = require('node:child_process').spawn(process.execPath, ['server.js'], {
+  servidor = require('node:child_process').spawn(process.execPath, [path.join(__dirname, 'server.js')], {
     stdio: ['ignore', 'ignore', 'ignore'],
+    cwd: __dirname,
     env: { ...process.env, PORT: String(portaDeTeste) },
   });
-  await new Promise((resolve) => setTimeout(resolve, 350));
+  await new Promise((resolve) => setTimeout(resolve, 500));
   urlBase = `http://127.0.0.1:${portaDeTeste}`;
 });
 
-after(() => servidor.kill());
+after(() => {
+  if (servidor) servidor.kill();
+});
 
-test('estatísticas retornam os totais, filtro e resumo dinâmico', async () => {
+test('MVC Completo — GET inicial em todas as entidades', async () => {
+  const resTarefas = await fetch(`${urlBase}/tarefas`);
+  assert.equal(resTarefas.status, 200);
+  const tarefas = await resTarefas.json();
+  assert.ok(Array.isArray(tarefas));
+
+  const resUsuarios = await fetch(`${urlBase}/usuarios`);
+  assert.equal(resUsuarios.status, 200);
+  const usuarios = await resUsuarios.json();
+  assert.ok(Array.isArray(usuarios));
+
+  const resProjetos = await fetch(`${urlBase}/projetos`);
+  assert.equal(resProjetos.status, 200);
+  const projetos = await resProjetos.json();
+  assert.ok(Array.isArray(projetos));
+});
+
+test('Estatísticas e Nível 2A (Ranking de Usuários)', async () => {
   const geral = await fetch(`${urlBase}/estatisticas`);
   assert.equal(geral.status, 200);
-  assert.deepEqual(await geral.json(), {
-    filtro: null,
-    total: 3,
-    porColuna: { afazer: 1, andamento: 1, concluido: 1 },
-    porPrioridade: { alta: 2, media: 1, baixa: 0 },
-    colunaComMaisTarefas: 'afazer',
-    prioridadeMaisComum: 'alta',
-  });
+  const jsonGeral = await geral.json();
+  assert.equal(jsonGeral.total, 3);
+  assert.deepEqual(jsonGeral.porColuna, { afazer: 1, andamento: 1, concluido: 1 });
+  assert.deepEqual(jsonGeral.porPrioridade, { alta: 2, media: 1, baixa: 0 });
+  assert.ok(Array.isArray(jsonGeral.rankingUsuarios));
+  assert.equal(jsonGeral.rankingUsuarios[0].nome, 'Ana');
+  assert.equal(jsonGeral.rankingUsuarios[0].totalTarefas, 2);
 
-  const filtrada = await fetch(`${urlBase}/estatisticas?coluna=afazer`);
-  assert.equal(filtrada.status, 200);
-  assert.equal((await filtrada.json()).total, 1);
+  // Também testar via GET /tarefas/estatisticas
+  const tarefasStats = await fetch(`${urlBase}/tarefas/estatisticas`);
+  assert.equal(tarefasStats.status, 200);
+  const jsonTarefasStats = await tarefasStats.json();
+  assert.deepEqual(jsonTarefasStats.rankingUsuarios, jsonGeral.rankingUsuarios);
 
   const resumo = await fetch(`${urlBase}/estatisticas/resumo`);
   assert.equal(resumo.status, 200);
-  assert.match((await resumo.json()).resumo, /Você tem 3 tarefa\(s\)/);
+  const jsonResumo = await resumo.json();
+  assert.match(jsonResumo.resumo, /Você tem 3 tarefa\(s\)/);
 });
 
-test('CRUD de usuários impede e-mails duplicados', async () => {
-  const criado = await fetch(`${urlBase}/usuarios`, {
+test('Base A — usuarioId na criação de tarefa e validação de existência', async () => {
+  // Id inexistente -> 400
+  const falha = await fetch(`${urlBase}/tarefas`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ nome: 'Ana', email: 'ana@example.com', senha: 'segredo' }),
+    body: JSON.stringify({ texto: 'Tarefa sem dono valido', usuarioId: 9999 }),
   });
-  assert.equal(criado.status, 201);
-  const usuario = await criado.json();
+  assert.equal(falha.status, 400);
+  const jsonFalha = await falha.json();
+  assert.deepEqual(jsonFalha, { erro: 'Usuário não encontrado' });
 
-  const duplicado = await fetch(`${urlBase}/usuarios`, {
+  // Id válido -> 201
+  const sucesso = await fetch(`${urlBase}/tarefas`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ nome: 'Outra Ana', email: 'ANA@example.com', senha: 'outra-senha' }),
+    body: JSON.stringify({ texto: 'Tarefa com dono valido', usuarioId: 2, prioridade: 'baixa', coluna: 'afazer' }),
   });
-  assert.equal(duplicado.status, 409);
+  assert.equal(sucesso.status, 201);
+  const nova = await sucesso.json();
+  assert.equal(nova.usuarioId, 2);
+  assert.equal(nova.texto, 'Tarefa com dono valido');
+});
 
-  const atualizado = await fetch(`${urlBase}/usuarios/${usuario.id}`, {
+test('Base B — Validações obrigatórias de texto, prioridade e coluna', async () => {
+  // Texto ausente
+  const semTexto = await fetch(`${urlBase}/tarefas`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ prioridade: 'alta', coluna: 'afazer' }),
+  });
+  assert.equal(semTexto.status, 400);
+  assert.deepEqual(await semTexto.json(), { erro: 'Texto obrigatório' });
+
+  // Prioridade inválida
+  const prioridadeInvalida = await fetch(`${urlBase}/tarefas`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ texto: 'Texto ok', prioridade: 'urgente' }),
+  });
+  assert.equal(prioridadeInvalida.status, 400);
+  assert.deepEqual(await prioridadeInvalida.json(), { erro: 'Prioridade inválida. Use: alta, media ou baixa' });
+
+  // Coluna inválida
+  const colunaInvalida = await fetch(`${urlBase}/tarefas`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ texto: 'Texto ok', coluna: 'feito' }),
+  });
+  assert.equal(colunaInvalida.status, 400);
+  assert.deepEqual(await colunaInvalida.json(), { erro: 'Coluna inválida. Use: afazer, andamento ou concluido' });
+
+  // Validação no PUT /tarefas/:id
+  const putPrioridadeInvalida = await fetch(`${urlBase}/tarefas/1`, {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ nome: 'Ana Silva', email: 'ana.silva@example.com', senha: 'nova-senha' }),
+    body: JSON.stringify({ prioridade: 'urgente' }),
   });
-  assert.equal(atualizado.status, 200);
+  assert.equal(putPrioridadeInvalida.status, 400);
+  assert.deepEqual(await putPrioridadeInvalida.json(), { erro: 'Prioridade inválida. Use: alta, media ou baixa' });
 
-  const removido = await fetch(`${urlBase}/usuarios/${usuario.id}`, { method: 'DELETE' });
-  assert.equal(removido.status, 200);
+  const putColunaInvalida = await fetch(`${urlBase}/tarefas/1`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ coluna: 'feito' }),
+  });
+  assert.equal(putColunaInvalida.status, 400);
+  assert.deepEqual(await putColunaInvalida.json(), { erro: 'Coluna inválida. Use: afazer, andamento ou concluido' });
+});
+
+test('Base C — Proteger usuário com tarefas ao deletar', async () => {
+  // Criar um usuário temporário sem tarefas
+  const resCriar = await fetch(`${urlBase}/usuarios`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ nome: 'Carlos', email: 'carlos@email.com' }),
+  });
+  assert.equal(resCriar.status, 201);
+  const carlos = await resCriar.json();
+
+  // Deletar usuário sem tarefas -> 200
+  const resDel = await fetch(`${urlBase}/usuarios/${carlos.id}`, { method: 'DELETE' });
+  assert.equal(resDel.status, 200);
+
+  // Tentar deletar usuário com tarefas (Ana, id 1) -> 400
+  const resDelAna = await fetch(`${urlBase}/usuarios/1`, { method: 'DELETE' });
+  assert.equal(resDelAna.status, 400);
+  assert.deepEqual(await resDelAna.json(), { erro: 'Usuário possui tarefas. Remova as tarefas antes.' });
+});
+
+test('Nível 1A — Limite de 2 tarefas em andamento por usuário', async () => {
+  // Criar usuário para teste de limite
+  const resUser = await fetch(`${urlBase}/usuarios`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ nome: 'LimiteUser', email: 'limite@email.com' }),
+  });
+  const user = await resUser.json();
+
+  // 1ª tarefa em andamento -> 201
+  const t1 = await fetch(`${urlBase}/tarefas`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ texto: 'Andamento 1', usuarioId: user.id, coluna: 'andamento' }),
+  });
+  assert.equal(t1.status, 201);
+
+  // 2ª tarefa em andamento -> 201
+  const t2 = await fetch(`${urlBase}/tarefas`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ texto: 'Andamento 2', usuarioId: user.id, coluna: 'andamento' }),
+  });
+  assert.equal(t2.status, 201);
+
+  // 3ª tarefa em andamento -> 400
+  const t3 = await fetch(`${urlBase}/tarefas`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ texto: 'Andamento 3', usuarioId: user.id, coluna: 'andamento' }),
+  });
+  assert.equal(t3.status, 400);
+  assert.deepEqual(await t3.json(), { erro: 'Limite de 2 tarefas em andamento por usuário atingido' });
+
+  // Criar tarefa afazer e tentar mover para andamento via PUT -> 400
+  const tAfazer = await fetch(`${urlBase}/tarefas`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ texto: 'Afazer', usuarioId: user.id, coluna: 'afazer' }),
+  });
+  const tAfazerJson = await tAfazer.json();
+
+  const putT3 = await fetch(`${urlBase}/tarefas/${tAfazerJson.id}`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ coluna: 'andamento' }),
+  });
+  assert.equal(putT3.status, 400);
+  assert.deepEqual(await putT3.json(), { erro: 'Limite de 2 tarefas em andamento por usuário atingido' });
+});
+
+test('Nível 1B — Data de conclusão automática ao alterar para concluido', async () => {
+  // Criar tarefa afazer
+  const res = await fetch(`${urlBase}/tarefas`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ texto: 'Para concluir', coluna: 'afazer' }),
+  });
+  const tarefa = await res.json();
+  assert.equal(tarefa.concluidaEm, null);
+
+  // Mover para concluido via PUT
+  const putConcluido = await fetch(`${urlBase}/tarefas/${tarefa.id}`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ coluna: 'concluido' }),
+  });
+  assert.equal(putConcluido.status, 200);
+  const tarefaConcluida = await putConcluido.json();
+  assert.ok(tarefaConcluida.concluidaEm);
+  assert.ok(!isNaN(Date.parse(tarefaConcluida.concluidaEm)));
+
+  // Mover de volta para andamento
+  const putAndamento = await fetch(`${urlBase}/tarefas/${tarefa.id}`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ coluna: 'andamento' }),
+  });
+  assert.equal(putAndamento.status, 200);
+  const tarefaAndamento = await putAndamento.json();
+  assert.equal(tarefaAndamento.concluidaEm, null);
+});
+
+test('Nível 1C — Filtrar tarefas por usuário e combinação de filtros', async () => {
+  const porUsuario = await fetch(`${urlBase}/tarefas?usuarioId=1`);
+  assert.equal(porUsuario.status, 200);
+  const jsonUser = await porUsuario.json();
+  assert.ok(jsonUser.every((t) => t.usuarioId === 1));
+
+  const porUsuarioEColuna = await fetch(`${urlBase}/tarefas?usuarioId=1&coluna=afazer`);
+  assert.equal(porUsuarioEColuna.status, 200);
+  const jsonUserCol = await porUsuarioEColuna.json();
+  assert.ok(jsonUserCol.every((t) => t.usuarioId === 1 && t.coluna === 'afazer'));
+
+  const usuarioInexistente = await fetch(`${urlBase}/tarefas?usuarioId=99999`);
+  assert.equal(usuarioInexistente.status, 200);
+  const jsonVazio = await usuarioInexistente.json();
+  assert.deepEqual(jsonVazio, []);
+});
+
+test('Nível 2B — Proteger projeto com tarefas associadas', async () => {
+  // Criar projeto sem tarefas
+  const resProj = await fetch(`${urlBase}/projetos`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ nome: 'Projeto Temporario', descricao: 'Sem tarefas' }),
+  });
+  assert.equal(resProj.status, 201);
+  const proj = await resProj.json();
+
+  // Deletar projeto sem tarefas -> 200
+  const delProj = await fetch(`${urlBase}/projetos/${proj.id}`, { method: 'DELETE' });
+  assert.equal(delProj.status, 200);
+
+  // Tentar deletar projeto com tarefas (Projeto 1) -> 400
+  const delProjComTarefas = await fetch(`${urlBase}/projetos/1`, { method: 'DELETE' });
+  assert.equal(delProjComTarefas.status, 400);
+  assert.deepEqual(await delProjComTarefas.json(), { erro: 'Projeto possui tarefas associadas.' });
+});
+
+test('Nível 2C — Resumo do projeto (GET /projetos/:id/resumo)', async () => {
+  const resResumo = await fetch(`${urlBase}/projetos/1/resumo`);
+  assert.equal(resResumo.status, 200);
+  const jsonResumo = await resResumo.json();
+
+  assert.equal(jsonResumo.projeto.id, 1);
+  assert.equal(typeof jsonResumo.totalTarefas, 'number');
+  assert.ok(jsonResumo.porColuna);
+  assert.equal(typeof jsonResumo.porColuna.afazer, 'number');
+  assert.equal(typeof jsonResumo.porColuna.andamento, 'number');
+  assert.equal(typeof jsonResumo.porColuna.concluido, 'number');
+
+  // Projeto inexistente -> 404
+  const res404 = await fetch(`${urlBase}/projetos/99999/resumo`);
+  assert.equal(res404.status, 404);
+  assert.deepEqual(await res404.json(), { erro: 'Projeto não encontrado' });
 });

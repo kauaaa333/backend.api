@@ -1,26 +1,25 @@
 const express = require('express');
-const app = express();
-const PORTA = 3000;
+const tarefasRoutes = require('./src/routes/tarefas.routes');
+const usuariosRoutes = require('./src/routes/usuarios.routes');
+const projetosRoutes = require('./src/routes/projetos.routes');
+const estatisticasRoutes = require('./src/routes/estatisticas.routes');
 
-// middleware -- essencial para ler o body das requisicoes POST, PUT, DELETE
+const app = express();
+const PORTA = process.env.PORT || 3000;
+
 app.use(express.json());
 
-// Rotas de tarefas
-app.use('/tarefas', require('./src/routes/tarefas.routes'));
+app.use('/tarefas', tarefasRoutes);
+app.use('/usuarios', usuariosRoutes);
+app.use('/projetos', projetosRoutes);
+app.use('/estatisticas', estatisticasRoutes);
 
-// Rotas de usuarios
-app.use('/usuarios', require('./src/routes/usuarios.routes'));
-
-// Rotas de estatisticas
-app.use('/estatisticas', require('./src/routes/estatisticas.routes'));
-
-// Rotas de projetos
-app.use('/projetos', require('./src/routes/projetos.routes'));
-
-// Rota 404 -- sempre por ultimo (captura tudo que nao foi tratado acima)
 app.use((req, res) => {
-  res.status(404).json({ erro: 'Rota nao encontrada', metodo: req.method, caminho: req.url });
+  res.status(404).json({ erro: 'Rota não encontrada' });
 });
 
-// Iniciar o servidor
-app.listen(PORTA, () => console.log(`Porta ${PORTA}`));
+app.listen(PORTA, () => {
+  console.log(`Servidor rodando em http://localhost:${PORTA}`);
+});
+
+module.exports = app;
