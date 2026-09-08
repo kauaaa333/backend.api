@@ -4,10 +4,20 @@ const usuariosRoutes = require('./src/routes/usuarios.routes');
 const projetosRoutes = require('./src/routes/projetos.routes');
 const estatisticasRoutes = require('./src/routes/estatisticas.routes');
 
+const logger = require('./src/middlewares/logger');
+const validarContentType = require('./src/middlewares/validarContentType');
+const temporizador = require('./src/middlewares/temporizador');
+
 const app = express();
 const PORTA = process.env.PORT || 3000;
 
+// Middleware de parser do body (precisa vir antes dos middlewares que dependem do req.body)
 app.use(express.json());
+
+// Middlewares globais (executam antes das rotas)
+app.use(temporizador);
+app.use(validarContentType);
+app.use(logger);
 
 app.use('/tarefas', tarefasRoutes);
 app.use('/usuarios', usuariosRoutes);

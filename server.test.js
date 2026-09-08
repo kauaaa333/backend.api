@@ -1,19 +1,47 @@
 const { after, before, test } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const net = require('node:net');
 
 let servidor;
 let urlBase;
-const portaDeTeste = 3107;
+let portaDeTeste;
+
+async function obterPortaLivre() {
+  const server = net.createServer();
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address();
+  server.close();
+  await new Promise((resolve) => server.on('close', resolve));
+  return port;
+}
+
+async function esperarServidorPronto(url, tentativas = 30) {
+  let ultimoErro;
+  for (let i = 0; i < tentativas; i++) {
+    try {
+      const resp = await fetch(url);
+      if (resp.ok) return;
+    } catch (err) {
+      ultimoErro = err;
+    }
+    // evita loop agressivo
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw ultimoErro || new Error('Servidor não respondeu a tempo');
+}
 
 before(async () => {
+  portaDeTeste = await obterPortaLivre();
+  urlBase = `http://127.0.0.1:${portaDeTeste}`;
+
   servidor = require('node:child_process').spawn(process.execPath, [path.join(__dirname, 'server.js')], {
     stdio: ['ignore', 'ignore', 'ignore'],
     cwd: __dirname,
     env: { ...process.env, PORT: String(portaDeTeste) },
   });
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  urlBase = `http://127.0.0.1:${portaDeTeste}`;
+
+  await esperarServidorPronto(`${urlBase}/tarefas`);
 });
 
 after(() => {
@@ -35,6 +63,28 @@ test('MVC Completo — GET inicial em todas as entidades', async () => {
   assert.equal(resProjetos.status, 200);
   const projetos = await resProjetos.json();
   assert.ok(Array.isArray(projetos));
+});
+
+test('Middlewares — validarContentType bloqueia POST/PUT sem application/json', async () => {
+  // POST /tarefas sem Content-Type: application/json -> 415
+  const postSemContentType = await fetch(`${urlBase}/tarefas`, {
+    method: 'POST',
+    body: JSON.stringify({ texto: 'Deve falhar', usuarioId: 1, prioridade: 'alta', coluna: 'afazer', projetoId: 1 }),
+  });
+  assert.equal(postSemContentType.status, 415);
+  assert.deepEqual(await postSemContentType.json(), {
+    erro: 'Content-Type inválido. Use: application/json',
+  });
+
+  // PUT /tarefas/:id sem Content-Type: application/json -> 415
+  const putSemContentType = await fetch(`${urlBase}/tarefas/1`, {
+    method: 'PUT',
+    body: JSON.stringify({ coluna: 'andamento' }),
+  });
+  assert.equal(putSemContentType.status, 415);
+  assert.deepEqual(await putSemContentType.json(), {
+    erro: 'Content-Type inválido. Use: application/json',
+  });
 });
 
 test('Estatísticas e Nível 2A (Ranking de Usuários)', async () => {
