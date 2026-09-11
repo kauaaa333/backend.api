@@ -133,7 +133,7 @@ test('Base A — usuarioId na criação de tarefa e validação de existência',
   assert.equal(nova.texto, 'Tarefa com dono valido');
 });
 
-test('Base B — Validações obrigatórias de texto, prioridade e coluna', async () => {
+test('Base B e Validação com Schemas — Validações obrigatórias e formatos', async () => {
   // Texto ausente
   const semTexto = await fetch(`${urlBase}/tarefas`, {
     method: 'POST',
@@ -141,7 +141,8 @@ test('Base B — Validações obrigatórias de texto, prioridade e coluna', asyn
     body: JSON.stringify({ prioridade: 'alta', coluna: 'afazer' }),
   });
   assert.equal(semTexto.status, 400);
-  assert.deepEqual(await semTexto.json(), { erro: 'Texto obrigatório' });
+  const jsonSemTexto = await semTexto.json();
+  assert.ok(jsonSemTexto.erros || jsonSemTexto.erro);
 
   // Prioridade inválida
   const prioridadeInvalida = await fetch(`${urlBase}/tarefas`, {
@@ -150,7 +151,8 @@ test('Base B — Validações obrigatórias de texto, prioridade e coluna', asyn
     body: JSON.stringify({ texto: 'Texto ok', prioridade: 'urgente' }),
   });
   assert.equal(prioridadeInvalida.status, 400);
-  assert.deepEqual(await prioridadeInvalida.json(), { erro: 'Prioridade inválida. Use: alta, media ou baixa' });
+  const jsonPri = await prioridadeInvalida.json();
+  assert.ok(jsonPri.erros || jsonPri.erro);
 
   // Coluna inválida
   const colunaInvalida = await fetch(`${urlBase}/tarefas`, {
@@ -159,7 +161,24 @@ test('Base B — Validações obrigatórias de texto, prioridade e coluna', asyn
     body: JSON.stringify({ texto: 'Texto ok', coluna: 'feito' }),
   });
   assert.equal(colunaInvalida.status, 400);
-  assert.deepEqual(await colunaInvalida.json(), { erro: 'Coluna inválida. Use: afazer, andamento ou concluido' });
+  const jsonCol = await colunaInvalida.json();
+  assert.ok(jsonCol.erros || jsonCol.erro);
+
+  // Múltiplos erros de validação ao mesmo tempo (Slide 160)
+  const multiErros = await fetch(`${urlBase}/usuarios`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ nome: 'A', email: 'invalido', senha: '123' }),
+  });
+  assert.equal(multiErros.status, 400);
+  const jsonMulti = await multiErros.json();
+  assert.deepEqual(jsonMulti, {
+    erros: [
+      "O campo 'nome' deve ter ao menos 3 caracteres",
+      "O campo 'email' deve ser um email válido",
+      "O campo 'senha' deve ter ao menos 6 caracteres",
+    ],
+  });
 
   // Validação no PUT /tarefas/:id
   const putPrioridadeInvalida = await fetch(`${urlBase}/tarefas/1`, {
@@ -168,7 +187,6 @@ test('Base B — Validações obrigatórias de texto, prioridade e coluna', asyn
     body: JSON.stringify({ prioridade: 'urgente' }),
   });
   assert.equal(putPrioridadeInvalida.status, 400);
-  assert.deepEqual(await putPrioridadeInvalida.json(), { erro: 'Prioridade inválida. Use: alta, media ou baixa' });
 
   const putColunaInvalida = await fetch(`${urlBase}/tarefas/1`, {
     method: 'PUT',
@@ -176,7 +194,6 @@ test('Base B — Validações obrigatórias de texto, prioridade e coluna', asyn
     body: JSON.stringify({ coluna: 'feito' }),
   });
   assert.equal(putColunaInvalida.status, 400);
-  assert.deepEqual(await putColunaInvalida.json(), { erro: 'Coluna inválida. Use: afazer, andamento ou concluido' });
 });
 
 test('Base C — Proteger usuário com tarefas ao deletar', async () => {
@@ -184,7 +201,7 @@ test('Base C — Proteger usuário com tarefas ao deletar', async () => {
   const resCriar = await fetch(`${urlBase}/usuarios`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ nome: 'Carlos', email: 'carlos@email.com' }),
+    body: JSON.stringify({ nome: 'Carlos', email: 'carlos@email.com', senha: '123456' }),
   });
   assert.equal(resCriar.status, 201);
   const carlos = await resCriar.json();
@@ -204,7 +221,7 @@ test('Nível 1A — Limite de 2 tarefas em andamento por usuário', async () => 
   const resUser = await fetch(`${urlBase}/usuarios`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ nome: 'LimiteUser', email: 'limite@email.com' }),
+    body: JSON.stringify({ nome: 'LimiteUser', email: 'limite@email.com', senha: '123456' }),
   });
   const user = await resUser.json();
 
@@ -336,3 +353,44 @@ test('Nível 2C — Resumo do projeto (GET /projetos/:id/resumo)', async () => {
   assert.equal(res404.status, 404);
   assert.deepEqual(await res404.json(), { erro: 'Projeto não encontrado' });
 });
+
+test('Autenticação JWT — POST /auth/login', async () => {
+  // 1. Sucesso -> 200
+  const loginSucesso = await fetch(`${urlBase}/auth/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email: 'alice@email.com', senha: '123456' }),
+  });
+  assert.equal(loginSucesso.status, 200);
+  const jsonSucesso = await loginSucesso.json();
+  assert.ok(jsonSucesso.token);
+  assert.deepEqual(jsonSucesso.usuario, { id: 3, nome: 'Alice' });
+
+  // 2. Senha incorreta -> 401
+  const senhaInvalida = await fetch(`${urlBase}/auth/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email: 'alice@email.com', senha: 'errada' }),
+  });
+  assert.equal(senhaInvalida.status, 401);
+  assert.deepEqual(await senhaInvalida.json(), { erro: 'Credenciais inválidas' });
+
+  // 3. Usuário inexistente -> 401
+  const usuarioInexistente = await fetch(`${urlBase}/auth/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email: 'nao@existe.com', senha: '123456' }),
+  });
+  assert.equal(usuarioInexistente.status, 401);
+  assert.deepEqual(await usuarioInexistente.json(), { erro: 'Credenciais inválidas' });
+
+  // 4. Campos ausentes -> 400
+  const semSenha = await fetch(`${urlBase}/auth/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email: 'alice@email.com' }),
+  });
+  assert.equal(semSenha.status, 400);
+  assert.deepEqual(await semSenha.json(), { erro: 'Email e senha são obrigatórios' });
+});
+

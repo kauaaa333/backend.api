@@ -7,3 +7,6 @@ node_modules/
 *.log
 npm-debug.log*
 tmp/
+# Arquivos de ambiente
+.env
+.env.local
