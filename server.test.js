@@ -394,3 +394,31 @@ test('Autenticação JWT — POST /auth/login', async () => {
   assert.deepEqual(await semSenha.json(), { erro: 'Email e senha são obrigatórios' });
 });
 
+test('Proteção JWT — GET /auth/perfil', async () => {
+  const semToken = await fetch(`${urlBase}/auth/perfil`);
+  assert.equal(semToken.status, 401);
+  assert.deepEqual(await semToken.json(), { erro: 'Token de autenticação não informado' });
+
+  const tokenInvalido = await fetch(`${urlBase}/auth/perfil`, {
+    headers: { authorization: 'Bearer token-inválido' },
+  });
+  assert.equal(tokenInvalido.status, 401);
+  assert.deepEqual(await tokenInvalido.json(), { erro: 'Token de autenticação inválido ou expirado' });
+
+  const login = await fetch(`${urlBase}/auth/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email: 'alice@email.com', senha: '123456' }),
+  });
+  const { token } = await login.json();
+
+  const perfil = await fetch(`${urlBase}/auth/perfil`, {
+    headers: { authorization: `Bearer ${token}` },
+  });
+  assert.equal(perfil.status, 200);
+  assert.deepEqual(await perfil.json(), {
+    id: 3,
+    nome: 'Alice',
+    email: 'alice@email.com',
+  });
+});

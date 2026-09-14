@@ -25,6 +25,16 @@ const authController = {
       usuario: { id: usuario.id, nome: usuario.nome },
     });
   },
+
+  perfil(req, res) {
+    const usuario = usuarioModel.buscarPorId(req.usuario.id);
+
+    if (!usuario) {
+      return res.status(404).json({ erro: 'Usuário não encontrado' });
+    }
+
+    return res.json({ id: usuario.id, nome: usuario.nome, email: usuario.email });
+  },
 };
 
 module.exports = authController;
