@@ -3,6 +3,7 @@ node_modules/
 # Variáveis de ambiente - podem conter senhas e chaves
 .env
 .env.local
+.env.example
 # Logs do Node
 *.log
 npm-debug.log*
