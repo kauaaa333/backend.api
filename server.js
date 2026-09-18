@@ -12,6 +12,7 @@ const estatisticasRoutes = require('./src/routes/estatisticas.routes');
 const logger = require('./src/middlewares/logger');
 const validarContentType = require('./src/middlewares/validarContentType');
 const temporizador = require('./src/middlewares/temporizador');
+const autenticar = require('./src/middlewares/autenticar');
 
 const app = express();
 const PORTA = process.env.PORT || process.env.PORTA || 3000;
@@ -35,10 +36,10 @@ app.use(validarContentType);
 app.use(logger);
 
 app.use('/auth', authRoutes);
-app.use('/tarefas', tarefasRoutes);
-app.use('/usuarios', usuariosRoutes);
-app.use('/projetos', projetosRoutes);
-app.use('/estatisticas', estatisticasRoutes);
+app.use('/tarefas', autenticar, tarefasRoutes);
+app.use('/usuarios', autenticar, usuariosRoutes);
+app.use('/projetos', autenticar, projetosRoutes);
+app.use('/estatisticas', autenticar, estatisticasRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ erro: 'Rota não encontrada' });

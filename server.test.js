@@ -6,6 +6,7 @@ const net = require('node:net');
 let servidor;
 let urlBase;
 let portaDeTeste;
+const fetchOriginal = global.fetch;
 
 async function obterPortaLivre() {
   const server = net.createServer();
@@ -21,7 +22,7 @@ async function esperarServidorPronto(url, tentativas = 30) {
   for (let i = 0; i < tentativas; i++) {
     try {
       const resp = await fetch(url);
-      if (resp.ok) return;
+      if (resp.status) return;
     } catch (err) {
       ultimoErro = err;
     }
@@ -42,9 +43,31 @@ before(async () => {
   });
 
   await esperarServidorPronto(`${urlBase}/tarefas`);
+
+  const respostaLogin = await fetchOriginal(`${urlBase}/auth/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email: 'alice@email.com', senha: '123456' }),
+  });
+  const { token } = await respostaLogin.json();
+
+  global.fetch = (url, opcoes = {}) => {
+    const destino = new URL(url);
+    if (destino.pathname.startsWith('/auth/')) {
+      return fetchOriginal(url, opcoes);
+    }
+
+    const headers = new Headers(opcoes.headers);
+    if (!headers.has('authorization')) {
+      headers.set('authorization', `Bearer ${token}`);
+    }
+
+    return fetchOriginal(url, { ...opcoes, headers });
+  };
 });
 
 after(() => {
+  global.fetch = fetchOriginal;
   if (servidor) servidor.kill();
 });
 
@@ -421,4 +444,16 @@ test('Proteção JWT — GET /auth/perfil', async () => {
     nome: 'Alice',
     email: 'alice@email.com',
   });
+});
+
+test('Proteção JWT — rotas privadas rejeitam token ausente ou inválido', async () => {
+  const semToken = await fetchOriginal(`${urlBase}/tarefas`);
+  assert.equal(semToken.status, 401);
+  assert.deepEqual(await semToken.json(), { erro: 'Token de autenticação não informado' });
+
+  const tokenInvalido = await fetchOriginal(`${urlBase}/tarefas`, {
+    headers: { authorization: 'Bearer token-invalido' },
+  });
+  assert.equal(tokenInvalido.status, 401);
+  assert.deepEqual(await tokenInvalido.json(), { erro: 'Token de autenticação inválido ou expirado' });
 });
