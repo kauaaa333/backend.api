@@ -66,7 +66,7 @@ function criar(req, res) {
   }
 
   // Base A: validação de usuarioId
-  let uId = null;
+  let uId = req.usuario?.id ?? null;
   if (usuarioId !== undefined && usuarioId !== null) {
     uId = Number(usuarioId);
     const usuario = usuarioModel.buscar(uId);
@@ -134,7 +134,7 @@ function atualizar(req, res) {
   }
 
   // Base A: validação de usuarioId
-  let targetUsuarioId = tarefaExistente.usuarioId;
+  let targetUsuarioId = tarefaExistente.usuarioId ?? req.usuario?.id ?? null;
   if (usuarioId !== undefined) {
     if (usuarioId !== null) {
       const uId = Number(usuarioId);
@@ -189,7 +189,7 @@ function atualizar(req, res) {
     ...(texto !== undefined ? { texto } : {}),
     ...(prioridade !== undefined ? { prioridade } : {}),
     ...(coluna !== undefined ? { coluna } : {}),
-    ...(usuarioId !== undefined ? { usuarioId: targetUsuarioId } : {}),
+    ...((usuarioId !== undefined || tarefaExistente.usuarioId === null) ? { usuarioId: targetUsuarioId } : {}),
     ...(projetoId !== undefined ? { projetoId: targetProjetoId } : {}),
     concluidaEm,
   };

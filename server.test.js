@@ -472,3 +472,14 @@ test('Proteção JWT — rotas privadas rejeitam token ausente ou inválido', as
   assert.equal(tokenInvalido.status, 401);
   assert.deepEqual(await tokenInvalido.json(), { erro: 'Token de autenticação inválido ou expirado' });
 });
+
+test('Tarefa sem usuarioId recebe o usuário autenticado', async () => {
+  const resposta = await fetch(`${urlBase}/tarefas`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ texto: 'Tarefa do usuário autenticado' }),
+  });
+
+  assert.equal(resposta.status, 201);
+  assert.equal((await resposta.json()).usuarioId, 3);
+});
