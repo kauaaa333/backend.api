@@ -16,11 +16,16 @@ const autenticar = require('./src/middlewares/autenticar');
 
 const app = express();
 const PORTA = process.env.PORT || process.env.PORTA || 3000;
+const origensPermitidas = [
+  'http://localhost:5173',
+  'https://task-flow-gamma-inky.vercel.app',
+  ...(process.env.CORS_ORIGIN || '').split(',').map((origem) => origem.trim()).filter(Boolean),
+];
 
 // CORS deve ser o PRIMEIRO middleware
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+    origin: origensPermitidas,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     maxAge: 86400,

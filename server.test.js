@@ -110,6 +110,21 @@ test('Middlewares — validarContentType bloqueia POST/PUT sem application/json'
   });
 });
 
+test('CORS — permite o front-end publicado na Vercel', async () => {
+  const resposta = await fetch(`${urlBase}/tarefas`, {
+    method: 'OPTIONS',
+    headers: {
+      origin: 'https://task-flow-gamma-inky.vercel.app',
+      'access-control-request-method': 'GET',
+      'access-control-request-headers': 'authorization,content-type',
+    },
+  });
+
+  assert.equal(resposta.status, 204);
+  assert.equal(resposta.headers.get('access-control-allow-origin'), 'https://task-flow-gamma-inky.vercel.app');
+  assert.match(resposta.headers.get('access-control-allow-headers'), /authorization/i);
+});
+
 test('Estatísticas e Nível 2A (Ranking de Usuários)', async () => {
   const geral = await fetch(`${urlBase}/estatisticas`);
   assert.equal(geral.status, 200);
