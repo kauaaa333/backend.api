@@ -1,7 +1,7 @@
 const schemas = {
   tarefa: {
     texto: { obrigatorio: true, tipo: 'string' },
-    prioridade: { obrigatorio: false, tipo: 'string', enum: ['alta', 'media', 'baixa'] },
+    idprioridade: { obrigatorio: false, tipo: 'number' },
     coluna: { obrigatorio: false, tipo: 'string', enum: ['afazer', 'andamento', 'concluido'] },
     usuarioId: { obrigatorio: false, tipo: 'number' },
   },

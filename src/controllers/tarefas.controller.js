@@ -1,9 +1,35 @@
 const tarefaModel = require('../models/tarefa.model');
 const usuarioModel = require('../models/usuario.model');
 const projetoModel = require('../models/projeto.model');
+const prioridadeModel = require('../models/prioridade.model');
 
 const COLUNAS_VALIDAS = ['afazer', 'andamento', 'concluido'];
-const PRIORIDADES_VALIDAS = ['alta', 'media', 'baixa'];
+const MSG_PRIORIDADE_INVALIDA = 'Prioridade inválida. Use o id de uma prioridade ativa (GET /prioridades)';
+
+// idprioridade é chave estrangeira para prioridades: precisa existir e estar ativa.
+// Na edição, a prioridade atual da tarefa continua aceita mesmo se tiver sido desativada.
+function prioridadeValida(idprioridade, idAtual = null) {
+  const prioridade = Number.isInteger(idprioridade) ? prioridadeModel.buscar(idprioridade) : null;
+  if (!prioridade) return false;
+  return prioridade.ativo || prioridade.id === idAtual;
+}
+
+// Compatibilidade: clientes antigos ainda enviam o texto 'prioridade' ('alta', 'media'...).
+// Converte para o id; texto desconhecido vira NaN e é recusado por prioridadeValida.
+function idPrioridadeDoCorpo(body) {
+  if (body.idprioridade !== undefined || typeof body.prioridade !== 'string') return body.idprioridade;
+  const descricao = body.prioridade.trim().toLowerCase();
+  const prioridade = prioridadeModel.listar().find((p) => p.descricao === descricao);
+  return prioridade ? prioridade.id : NaN;
+}
+
+// Contagem por descrição, da mais importante para a menos (desempate favorece a mais importante)
+function contarPorPrioridade(tarefas) {
+  const prioridades = [...prioridadeModel.listar()].sort((a, b) => b.id - a.id);
+  return Object.fromEntries(
+    prioridades.map((p) => [p.descricao, tarefas.filter((t) => t.idprioridade === p.id).length])
+  );
+}
 
 function valorMaisComum(contagem) {
   const entradas = Object.entries(contagem);
@@ -48,16 +74,17 @@ function buscarPorId(req, res) {
 
 // Base A, Base B, Nível 1A, Nível 1B
 function criar(req, res) {
-  const { texto, prioridade, coluna, usuarioId, projetoId } = req.body;
+  const { texto, coluna, usuarioId, projetoId } = req.body;
+  const idprioridade = idPrioridadeDoCorpo(req.body);
 
   // Validação: texto obrigatório
   if (!texto || (typeof texto === 'string' && !texto.trim())) {
     return res.status(400).json({ erro: 'Texto obrigatório' });
   }
 
-  // Base B: validação de prioridade
-  if (prioridade && !PRIORIDADES_VALIDAS.includes(prioridade)) {
-    return res.status(400).json({ erro: 'Prioridade inválida. Use: alta, media ou baixa' });
+  // Base B: validação de prioridade (FK para prioridades)
+  if (idprioridade !== undefined && idprioridade !== null && !prioridadeValida(idprioridade)) {
+    return res.status(400).json({ erro: MSG_PRIORIDADE_INVALIDA });
   }
 
   // Base B: validação de coluna
@@ -86,7 +113,8 @@ function criar(req, res) {
   }
 
   const colunaFinal = coluna || 'afazer';
-  const prioridadeFinal = prioridade || 'media';
+  // Sem prioridade informada: padrão 'media', igual ao DEFAULT 3 do banco
+  const prioridadeFinal = idprioridade ?? prioridadeModel.ID_PADRAO;
 
   // Nível 1A: limite de 2 tarefas em andamento por usuário
   if (colunaFinal === 'andamento' && uId !== null) {
@@ -103,7 +131,7 @@ function criar(req, res) {
 
   const novaTarefa = tarefaModel.adicionar({
     texto: texto.trim(),
-    prioridade: prioridadeFinal,
+    idprioridade: prioridadeFinal,
     coluna: colunaFinal,
     usuarioId: uId,
     projetoId: pId,
@@ -121,11 +149,12 @@ function atualizar(req, res) {
     return res.status(404).json({ erro: 'Tarefa não encontrada' });
   }
 
-  const { texto, prioridade, coluna, usuarioId, projetoId } = req.body;
+  const { texto, coluna, usuarioId, projetoId } = req.body;
+  const idprioridade = idPrioridadeDoCorpo(req.body);
 
-  // Base B: validação de prioridade
-  if (prioridade !== undefined && !PRIORIDADES_VALIDAS.includes(prioridade)) {
-    return res.status(400).json({ erro: 'Prioridade inválida. Use: alta, media ou baixa' });
+  // Base B: validação de prioridade (FK para prioridades)
+  if (idprioridade !== undefined && !prioridadeValida(idprioridade, tarefaExistente.idprioridade)) {
+    return res.status(400).json({ erro: MSG_PRIORIDADE_INVALIDA });
   }
 
   // Base B: validação de coluna
@@ -187,7 +216,7 @@ function atualizar(req, res) {
 
   const dadosAtualizacao = {
     ...(texto !== undefined ? { texto } : {}),
-    ...(prioridade !== undefined ? { prioridade } : {}),
+    ...(idprioridade !== undefined ? { idprioridade } : {}),
     ...(coluna !== undefined ? { coluna } : {}),
     ...((usuarioId !== undefined || tarefaExistente.usuarioId === null) ? { usuarioId: targetUsuarioId } : {}),
     ...(projetoId !== undefined ? { projetoId: targetProjetoId } : {}),
@@ -225,11 +254,7 @@ function estatisticas(req, res) {
     concluido: tarefasFiltradas.filter((t) => t.coluna === 'concluido').length,
   };
 
-  const porPrioridade = {
-    alta: tarefasFiltradas.filter((t) => t.prioridade === 'alta').length,
-    media: tarefasFiltradas.filter((t) => t.prioridade === 'media').length,
-    baixa: tarefasFiltradas.filter((t) => t.prioridade === 'baixa').length,
-  };
+  const porPrioridade = contarPorPrioridade(tarefasFiltradas);
 
   // Nível 2A: ranking de usuários
   const usuarios = usuarioModel.listar();
@@ -261,11 +286,7 @@ function resumo(req, res) {
   const afazer = todas.filter((t) => t.coluna === 'afazer').length;
   const andamento = todas.filter((t) => t.coluna === 'andamento').length;
   const concluido = todas.filter((t) => t.coluna === 'concluido').length;
-  const contagemPrioridade = {
-    alta: todas.filter((t) => t.prioridade === 'alta').length,
-    media: todas.filter((t) => t.prioridade === 'media').length,
-    baixa: todas.filter((t) => t.prioridade === 'baixa').length,
-  };
+  const contagemPrioridade = contarPorPrioridade(todas);
   const prioridadeMaisComum = valorMaisComum(contagemPrioridade);
 
   res.json({
