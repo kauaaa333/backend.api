@@ -59,7 +59,6 @@ function remover(req, res) {
     return res.status(404).json({ erro: 'Usuário não encontrado' });
   }
 
-  // Base C -- Não permitir deletar usuário que tem tarefas associadas
   const tarefasDoUsuario = tarefaModel.listar().filter((t) => t.usuarioId === id);
   if (tarefasDoUsuario.length > 0) {
     return res.status(400).json({ erro: 'Usuário possui tarefas. Remova as tarefas antes.' });

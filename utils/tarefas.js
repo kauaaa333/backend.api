@@ -1,5 +1,3 @@
-// utils/tarefas.js - módulo de tarefas
-// module.exports define o que este arquivo exporta para quem fizer require() dele
 
 const tarefas = [];
 
