@@ -11,3 +11,6 @@ tmp/
 # Arquivos de ambiente
 .env
 .env.local
+
+.vercel
+.env*
