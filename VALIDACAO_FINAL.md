@@ -19,7 +19,15 @@
 
 ## Publicação e verificação remota
 
-O envio ao GitHub, os resultados do CI e as verificações da nova publicação em produção serão registrados nesta seção após sua execução. Não considerar etapas pendentes como aprovadas.
+- Backend enviado à `main`: implementação `59ff393`, repositório https://github.com/kauaaa333/backend.api. CI aprovado: https://github.com/kauaaa333/backend.api/actions/runs/40866906953 (inclui os testes contra PostgreSQL efêmero).
+- Frontend enviado à `main`: `1d5c4c1`, repositório canônico https://github.com/kauaaa333/TaskFlow. CI aprovado: https://github.com/kauaaa333/TaskFlow/actions/runs/40866913408 (testes, lint, build, auditoria e verificação de segredos).
+- Backend publicado automaticamente pelo Git na Vercel: deployment `dpl_GHEjP6PNwDgS4oHE5Cc2LVPk51HM`, estado READY e alias https://backend-api-black-seven.vercel.app.
+- Frontend publicado a partir dos arquivos do commit acima: deployment `dpl_HFiQzQjFAwePw32SBAygz1AWDKa2`, estado READY e alias https://task-flow-gamma-inky.vercel.app. O envio ao GitHub não iniciou uma publicação automática desse projeto; a publicação foi feita pela conexão Vercel existente, sem credenciais no código.
+- Postman/Newman em produção: 37 requisições e 68 verificações, zero falhas. Os registros temporários foram removidos pela coleção. Consulta independente após execução: 9 usuários, 5 projetos, 11 tarefas, 4 comentários, 31 eventos de auditoria (antes: 28).
+- Login da conta administradora: HTTP 200; tentativa com senha didática: HTTP 401. A sessão antiga do navegador foi invalidada pela rotação da chave, conforme esperado.
+- Navegador no endereço principal: login do novo administrador, leitura das 11 tarefas, filtro Urgente e retorno a Todas, abertura da confirmação de exclusão e cancelamento sem apagar tarefa de produção. Senha pública não aparece mais na tela de login. O erro 401 observado antes do novo login corresponde à sessão antiga revogada, não ao fluxo autenticado atual.
+
+Relatórios sanitizados e capturas de tela ficam em `tmp/validacao-final/`, ignorados pelo Git. Não publicar dumps completos do executor: eles podem incluir credenciais e tokens.
 
 ## Limites operacionais
 
