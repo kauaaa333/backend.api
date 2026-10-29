@@ -1,4 +1,3 @@
-
 const tarefas = [];
 
 function listarTodas() {
@@ -22,5 +21,4 @@ function remover(id) {
   return null;
 }
 
-// Exportar objeto com todas as funções
 module.exports = { listarTodas, buscarPorId, adicionar, remover };

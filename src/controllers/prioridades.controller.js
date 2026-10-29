@@ -1,7 +1,7 @@
 const prioridadeModel = require('../models/prioridade.model');
 
-function listar(req, res) {
-  res.json(prioridadeModel.listar());
+async function listar(req, res) {
+  res.json(await prioridadeModel.listar());
 }
 
 module.exports = {

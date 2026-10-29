@@ -1,73 +1,78 @@
+const criarErro = require('../utils/criarErro');
+const { podeAcessar } = require('../utils/acesso');
 const projetoModel = require('../models/projeto.model');
 const tarefaModel = require('../models/tarefa.model');
 
-function listar(req, res) {
-  res.json(projetoModel.listar());
+async function listar(req, res) {
+  res.json((await projetoModel.listar()).filter((p) => podeAcessar(req.usuario, p)));
 }
 
-function buscarPorId(req, res) {
+async function buscarPorId(req, res) {
   const id = Number(req.params.id);
-  const projeto = projetoModel.buscar(id);
-  if (!projeto) {
-    return res.status(404).json({ erro: 'Projeto não encontrado' });
+  const projeto = await projetoModel.buscar(id);
+  if (!podeAcessar(req.usuario, projeto)) {
+    throw criarErro(404, 'Projeto não encontrado');
   }
   res.json(projeto);
 }
 
-function criar(req, res) {
+async function criar(req, res) {
   const { nome, descricao } = req.body;
   if (!nome) {
-    return res.status(400).json({ erro: 'Nome obrigatório' });
+    throw criarErro(400, 'Nome obrigatório');
   }
-  if (projetoModel.buscarPorNome(nome)) {
-    return res.status(400).json({ erro: 'Projeto já cadastrado' });
+  if (await projetoModel.buscarPorNome(nome)) {
+    throw criarErro(409, 'Projeto já cadastrado', ['Valor repetido em: nome']);
   }
-  const novoProjeto = projetoModel.adicionar({ nome, descricao });
+  const novoProjeto = await projetoModel.adicionar({
+    nome: nome.trim(),
+    descricao,
+    usuarioId: req.usuario.id,
+  });
   res.status(201).json(novoProjeto);
 }
 
-function atualizar(req, res) {
+async function atualizar(req, res) {
   const id = Number(req.params.id);
-  if (!projetoModel.buscar(id)) {
-    return res.status(404).json({ erro: 'Projeto não encontrado' });
+  if (!podeAcessar(req.usuario, await projetoModel.buscar(id))) {
+    throw criarErro(404, 'Projeto não encontrado');
   }
   const { nome, descricao } = req.body;
   if (nome) {
-    const existente = projetoModel.buscarPorNome(nome);
+    const existente = await projetoModel.buscarPorNome(nome);
     if (existente && existente.id !== id) {
-      return res.status(400).json({ erro: 'Projeto já cadastrado' });
+      throw criarErro(409, 'Projeto já cadastrado', ['Valor repetido em: nome']);
     }
   }
-  const atualizado = projetoModel.atualizar(id, { nome, descricao });
+  const atualizado = await projetoModel.atualizar(id, { nome, descricao });
+  if (!atualizado) throw criarErro(404, 'Projeto não encontrado');
   res.json(atualizado);
 }
 
-function remover(req, res) {
+async function remover(req, res) {
   const id = Number(req.params.id);
-  const projeto = projetoModel.buscar(id);
-  if (!projeto) {
-    return res.status(404).json({ erro: 'Projeto não encontrado' });
+  const projeto = await projetoModel.buscar(id);
+  if (!podeAcessar(req.usuario, projeto)) {
+    throw criarErro(404, 'Projeto não encontrado');
   }
 
-  // Nível 2B -- Proteger projeto com tarefas
-  const tarefasDoProjeto = tarefaModel.listar().filter((t) => t.projetoId === id);
+  const tarefasDoProjeto = (await tarefaModel.listar()).filter((t) => t.projetoId === id);
   if (tarefasDoProjeto.length > 0) {
-    return res.status(400).json({ erro: 'Projeto possui tarefas associadas.' });
+    throw criarErro(409, 'Projeto possui tarefas associadas.');
   }
 
-  const removido = projetoModel.remover(id);
-  res.json({ mensagem: 'Projeto removido com sucesso', id: removido.id, projeto: removido });
+  if (!(await projetoModel.remover(id))) throw criarErro(404, 'Projeto não encontrado');
+  res.status(204).end();
 }
 
-// Nível 2C -- Resumo do projeto: GET /projetos/:id/resumo
-function resumo(req, res) {
+async function resumo(req, res) {
   const id = Number(req.params.id);
-  const projeto = projetoModel.buscar(id);
-  if (!projeto) {
-    return res.status(404).json({ erro: 'Projeto não encontrado' });
+  const projeto = await projetoModel.buscar(id);
+  if (!podeAcessar(req.usuario, projeto)) {
+    throw criarErro(404, 'Projeto não encontrado');
   }
 
-  const tarefas = tarefaModel.listar().filter((t) => t.projetoId === id);
+  const tarefas = (await tarefaModel.listar()).filter((t) => t.projetoId === id);
   const porColuna = {
     afazer: tarefas.filter((t) => t.coluna === 'afazer').length,
     andamento: tarefas.filter((t) => t.coluna === 'andamento').length,

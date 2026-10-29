@@ -1,33 +1,39 @@
+const criarErro = require('../utils/criarErro');
+const { podeAcessar } = require('../utils/acesso');
 const tarefaModel = require('../models/tarefa.model');
 const usuarioModel = require('../models/usuario.model');
 const projetoModel = require('../models/projeto.model');
 const prioridadeModel = require('../models/prioridade.model');
 
 const COLUNAS_VALIDAS = ['afazer', 'andamento', 'concluido'];
-const MSG_PRIORIDADE_INVALIDA = 'Prioridade inválida. Use o id de uma prioridade ativa (GET /prioridades)';
+const MSG_PRIORIDADE_INVALIDA =
+  'Prioridade inválida. Use o id de uma prioridade ativa (GET /prioridades)';
 
 // idprioridade é chave estrangeira para prioridades: precisa existir e estar ativa.
 // Na edição, a prioridade atual da tarefa continua aceita mesmo se tiver sido desativada.
-function prioridadeValida(idprioridade, idAtual = null) {
-  const prioridade = Number.isInteger(idprioridade) ? prioridadeModel.buscar(idprioridade) : null;
+async function prioridadeValida(idprioridade, idAtual = null) {
+  const prioridade = Number.isInteger(idprioridade)
+    ? await prioridadeModel.buscar(idprioridade)
+    : null;
   if (!prioridade) return false;
   return prioridade.ativo || prioridade.id === idAtual;
 }
 
 // Compatibilidade: clientes antigos ainda enviam o texto 'prioridade' ('alta', 'media'...).
 // Converte para o id; texto desconhecido vira NaN e é recusado por prioridadeValida.
-function idPrioridadeDoCorpo(body) {
-  if (body.idprioridade !== undefined || typeof body.prioridade !== 'string') return body.idprioridade;
+async function idPrioridadeDoCorpo(body) {
+  if (body.idprioridade !== undefined || typeof body.prioridade !== 'string')
+    return body.idprioridade;
   const descricao = body.prioridade.trim().toLowerCase();
-  const prioridade = prioridadeModel.listar().find((p) => p.descricao === descricao);
+  const prioridade = (await prioridadeModel.listar()).find((p) => p.descricao === descricao);
   return prioridade ? prioridade.id : NaN;
 }
 
 // Contagem por descrição, da mais importante para a menos (desempate favorece a mais importante)
-function contarPorPrioridade(tarefas) {
-  const prioridades = [...prioridadeModel.listar()].sort((a, b) => b.id - a.id);
+async function contarPorPrioridade(tarefas) {
+  const prioridades = [...(await prioridadeModel.listarTodas())].sort((a, b) => b.id - a.id);
   return Object.fromEntries(
-    prioridades.map((p) => [p.descricao, tarefas.filter((t) => t.idprioridade === p.id).length])
+    prioridades.map((p) => [p.descricao, tarefas.filter((t) => t.idprioridade === p.id).length]),
   );
 }
 
@@ -38,179 +44,173 @@ function valorMaisComum(contagem) {
   return ordenada[0][1] > 0 ? ordenada[0][0] : null;
 }
 
-// Nível 1C -- Filtrar tarefas por query params (usuarioId, coluna, projetoId)
-function listar(req, res) {
+async function listar(req, res) {
   const { usuarioId, coluna, projetoId } = req.query;
-  const paramProjetoId = req.params && req.params.id ? req.params.id : null;
+  const projetoIdDaRota = req.params && req.params.id ? req.params.id : null;
+  if (
+    projetoIdDaRota &&
+    !podeAcessar(req.usuario, await projetoModel.buscar(Number(projetoIdDaRota)))
+  )
+    throw criarErro(404, 'Projeto não encontrado');
 
-  let resultado = tarefaModel.listar();
+  let resultado = await tarefaModel.listarAcessiveis(req.usuario);
 
   if (usuarioId !== undefined) {
-    const uId = Number(usuarioId);
-    resultado = resultado.filter((t) => t.usuarioId === uId);
+    const idUsuario = Number(usuarioId);
+    resultado = resultado.filter((t) => t.usuarioId === idUsuario);
   }
 
   if (coluna) {
     resultado = resultado.filter((t) => t.coluna === coluna);
   }
 
-  const projId = paramProjetoId || projetoId;
-  if (projId !== undefined && projId !== null) {
-    const pId = Number(projId);
-    resultado = resultado.filter((t) => t.projetoId === pId);
+  const filtroProjetoId = projetoIdDaRota || projetoId;
+  if (filtroProjetoId !== undefined && filtroProjetoId !== null) {
+    const idProjeto = Number(filtroProjetoId);
+    resultado = resultado.filter((t) => t.projetoId === idProjeto);
   }
 
   res.json(resultado);
 }
 
-function buscarPorId(req, res) {
+async function buscarPorId(req, res) {
   const id = Number(req.params.id);
-  const tarefa = tarefaModel.buscar(id);
+  const tarefa = await tarefaModel.buscarAcessivel(id, req.usuario);
   if (!tarefa) {
-    return res.status(404).json({ erro: 'Tarefa não encontrada' });
+    throw criarErro(404, 'Tarefa não encontrada');
   }
   res.json(tarefa);
 }
 
-// Base A, Base B, Nível 1A, Nível 1B
-function criar(req, res) {
-  const { texto, coluna, usuarioId, projetoId } = req.body;
-  const idprioridade = idPrioridadeDoCorpo(req.body);
+async function criar(req, res) {
+  const { texto, coluna, usuarioId, projetoId, ordem } = req.body;
+  const idprioridade = await idPrioridadeDoCorpo(req.body);
 
-  // Validação: texto obrigatório
   if (!texto || (typeof texto === 'string' && !texto.trim())) {
-    return res.status(400).json({ erro: 'Texto obrigatório' });
+    throw criarErro(400, 'Texto obrigatório');
   }
 
-  // Base B: validação de prioridade (FK para prioridades)
-  if (idprioridade !== undefined && idprioridade !== null && !prioridadeValida(idprioridade)) {
-    return res.status(400).json({ erro: MSG_PRIORIDADE_INVALIDA });
+  if (
+    idprioridade !== undefined &&
+    idprioridade !== null &&
+    !(await prioridadeValida(idprioridade))
+  ) {
+    throw criarErro(400, MSG_PRIORIDADE_INVALIDA);
   }
 
-  // Base B: validação de coluna
   if (coluna && !COLUNAS_VALIDAS.includes(coluna)) {
-    return res.status(400).json({ erro: 'Coluna inválida. Use: afazer, andamento ou concluido' });
+    throw criarErro(400, 'Coluna inválida. Use: afazer, andamento ou concluido');
   }
 
-  // Base A: validação de usuarioId
-  let uId = req.usuario?.id ?? null;
+  if (!req.usuario.administrador && usuarioId != null && usuarioId !== req.usuario.id)
+    throw criarErro(403, 'Não é permitido atribuir a tarefa a outro usuário');
+  let idUsuario = req.usuario.id;
   if (usuarioId !== undefined && usuarioId !== null) {
-    uId = Number(usuarioId);
-    const usuario = usuarioModel.buscar(uId);
+    idUsuario = Number(usuarioId);
+    const usuario = await usuarioModel.buscar(idUsuario);
     if (!usuario) {
-      return res.status(400).json({ erro: 'Usuário não encontrado' });
+      throw criarErro(400, 'Usuário não encontrado');
     }
   }
 
-  // Validação de projetoId (se enviado)
-  let pId = null;
+  let idProjeto = null;
   if (projetoId !== undefined && projetoId !== null) {
-    pId = Number(projetoId);
-    const projeto = projetoModel.buscar(pId);
-    if (!projeto) {
-      return res.status(400).json({ erro: 'Projeto não encontrado' });
+    idProjeto = Number(projetoId);
+    const projeto = await projetoModel.buscar(idProjeto);
+    if (!projeto || !podeAcessar(req.usuario, projeto)) {
+      throw criarErro(400, 'Projeto não encontrado');
     }
   }
 
   const colunaFinal = coluna || 'afazer';
   // Sem prioridade informada: padrão 'media', igual ao DEFAULT 3 do banco
   const prioridadeFinal = idprioridade ?? prioridadeModel.ID_PADRAO;
+  if (!(await prioridadeValida(prioridadeFinal)))
+    throw criarErro(400, MSG_PRIORIDADE_INVALIDA);
 
-  // Nível 1A: limite de 2 tarefas em andamento por usuário
-  if (colunaFinal === 'andamento' && uId !== null) {
-    const tarefasEmAndamento = tarefaModel
-      .listar()
-      .filter((t) => t.usuarioId === uId && t.coluna === 'andamento').length;
+  if (colunaFinal === 'andamento' && idUsuario !== null) {
+    const tarefasEmAndamento = (await tarefaModel.listarAcessiveis(req.usuario)).filter(
+      (t) => t.usuarioId === idUsuario && t.coluna === 'andamento',
+    ).length;
     if (tarefasEmAndamento >= 2) {
-      return res.status(400).json({ erro: 'Limite de 2 tarefas em andamento por usuário atingido' });
+      throw criarErro(400, 'Limite de 2 tarefas em andamento por usuário atingido');
     }
   }
 
-  // Nível 1B: data de conclusão automática
-  const concluidaEm = colunaFinal === 'concluido' ? new Date().toISOString() : null;
-
-  const novaTarefa = tarefaModel.adicionar({
-    texto: texto.trim(),
-    idprioridade: prioridadeFinal,
-    coluna: colunaFinal,
-    usuarioId: uId,
-    projetoId: pId,
-    concluidaEm,
-  });
+  const novaTarefa = await tarefaModel.adicionar(
+    {
+      texto: texto.trim(),
+      idprioridade: prioridadeFinal,
+      coluna: colunaFinal,
+      usuarioId: idUsuario,
+      projetoId: idProjeto,
+      ordem,
+    },
+    req.usuario,
+  );
 
   res.status(201).json(novaTarefa);
 }
 
-// Base B, Nível 1A, Nível 1B
-function atualizar(req, res) {
+async function atualizar(req, res) {
   const id = Number(req.params.id);
-  const tarefaExistente = tarefaModel.buscar(id);
+  const tarefaExistente = await tarefaModel.buscarAcessivel(id, req.usuario);
   if (!tarefaExistente) {
-    return res.status(404).json({ erro: 'Tarefa não encontrada' });
+    throw criarErro(404, 'Tarefa não encontrada');
   }
 
-  const { texto, coluna, usuarioId, projetoId } = req.body;
-  const idprioridade = idPrioridadeDoCorpo(req.body);
+  const { texto, coluna, usuarioId, projetoId, ordem } = req.body;
+  const idprioridade = await idPrioridadeDoCorpo(req.body);
 
-  // Base B: validação de prioridade (FK para prioridades)
-  if (idprioridade !== undefined && !prioridadeValida(idprioridade, tarefaExistente.idprioridade)) {
-    return res.status(400).json({ erro: MSG_PRIORIDADE_INVALIDA });
+  if (
+    idprioridade !== undefined &&
+    !(await prioridadeValida(idprioridade, tarefaExistente.idprioridade))
+  ) {
+    throw criarErro(400, MSG_PRIORIDADE_INVALIDA);
   }
 
-  // Base B: validação de coluna
   if (coluna !== undefined && !COLUNAS_VALIDAS.includes(coluna)) {
-    return res.status(400).json({ erro: 'Coluna inválida. Use: afazer, andamento ou concluido' });
+    throw criarErro(400, 'Coluna inválida. Use: afazer, andamento ou concluido');
   }
 
-  // Base A: validação de usuarioId
-  let targetUsuarioId = tarefaExistente.usuarioId ?? req.usuario?.id ?? null;
+  if (!req.usuario.administrador && usuarioId !== undefined && usuarioId !== req.usuario.id)
+    throw criarErro(403, 'Não é permitido atribuir a tarefa a outro usuário');
+  let usuarioIdAtualizado = tarefaExistente.usuarioId ?? req.usuario.id;
   if (usuarioId !== undefined) {
     if (usuarioId !== null) {
-      const uId = Number(usuarioId);
-      const usuario = usuarioModel.buscar(uId);
+      const idUsuario = Number(usuarioId);
+      const usuario = await usuarioModel.buscar(idUsuario);
       if (!usuario) {
-        return res.status(400).json({ erro: 'Usuário não encontrado' });
+        throw criarErro(400, 'Usuário não encontrado');
       }
-      targetUsuarioId = uId;
+      usuarioIdAtualizado = idUsuario;
     } else {
-      targetUsuarioId = null;
+      usuarioIdAtualizado = null;
     }
   }
 
-  // Validação de projetoId
-  let targetProjetoId = tarefaExistente.projetoId;
+  let projetoIdAtualizado = tarefaExistente.projetoId;
   if (projetoId !== undefined) {
     if (projetoId !== null) {
-      const pId = Number(projetoId);
-      const projeto = projetoModel.buscar(pId);
-      if (!projeto) {
-        return res.status(400).json({ erro: 'Projeto não encontrado' });
+      const idProjeto = Number(projetoId);
+      const projeto = await projetoModel.buscar(idProjeto);
+      if (!projeto || !podeAcessar(req.usuario, projeto)) {
+        throw criarErro(400, 'Projeto não encontrado');
       }
-      targetProjetoId = pId;
+      projetoIdAtualizado = idProjeto;
     } else {
-      targetProjetoId = null;
+      projetoIdAtualizado = null;
     }
   }
 
-  const targetColuna = coluna !== undefined ? coluna : tarefaExistente.coluna;
+  const colunaAtualizada = coluna !== undefined ? coluna : tarefaExistente.coluna;
 
-  // Nível 1A: limite de 2 tarefas em andamento por usuário
-  if (targetColuna === 'andamento' && targetUsuarioId !== null) {
-    const tarefasEmAndamento = tarefaModel
-      .listar()
-      .filter((t) => t.id !== id && t.usuarioId === targetUsuarioId && t.coluna === 'andamento').length;
+  if (colunaAtualizada === 'andamento' && usuarioIdAtualizado !== null) {
+    const tarefasEmAndamento = (await tarefaModel.listarAcessiveis(req.usuario)).filter(
+      (t) => t.id !== id && t.usuarioId === usuarioIdAtualizado && t.coluna === 'andamento',
+    ).length;
     if (tarefasEmAndamento >= 2) {
-      return res.status(400).json({ erro: 'Limite de 2 tarefas em andamento por usuário atingido' });
-    }
-  }
-
-  // Nível 1B: data de conclusão automática
-  let concluidaEm = tarefaExistente.concluidaEm;
-  if (coluna !== undefined) {
-    if (coluna === 'concluido') {
-      concluidaEm = new Date().toISOString();
-    } else {
-      concluidaEm = null;
+      throw criarErro(400, 'Limite de 2 tarefas em andamento por usuário atingido');
     }
   }
 
@@ -218,34 +218,38 @@ function atualizar(req, res) {
     ...(texto !== undefined ? { texto } : {}),
     ...(idprioridade !== undefined ? { idprioridade } : {}),
     ...(coluna !== undefined ? { coluna } : {}),
-    ...((usuarioId !== undefined || tarefaExistente.usuarioId === null) ? { usuarioId: targetUsuarioId } : {}),
-    ...(projetoId !== undefined ? { projetoId: targetProjetoId } : {}),
-    concluidaEm,
+    ...(usuarioId !== undefined || tarefaExistente.usuarioId === null
+      ? { usuarioId: usuarioIdAtualizado }
+      : {}),
+    ...(projetoId !== undefined ? { projetoId: projetoIdAtualizado } : {}),
+    ...(ordem !== undefined ? { ordem } : {}),
   };
 
-  const tarefaAtualizada = tarefaModel.atualizar(id, dadosAtualizacao);
+  const tarefaAtualizada = await tarefaModel.atualizar(id, dadosAtualizacao, req.usuario);
+  if (!tarefaAtualizada) throw criarErro(404, 'Tarefa não encontrada');
   res.json(tarefaAtualizada);
 }
 
-function remover(req, res) {
+async function remover(req, res) {
   const id = Number(req.params.id);
-  const tarefa = tarefaModel.remover(id);
+  const tarefa = await tarefaModel.remover(id, req.usuario);
   if (!tarefa) {
-    return res.status(404).json({ erro: 'Tarefa não encontrada' });
+    throw criarErro(404, 'Tarefa não encontrada');
   }
-  res.json({ mensagem: 'Tarefa removida', tarefa });
+  res.status(204).end();
 }
 
-// Nível 2A -- Estatísticas e Ranking de Usuários
-function estatisticas(req, res) {
-  const { coluna, projetoId } = req.query;
+async function estatisticas(req, res) {
+  const { coluna, projetoId, usuarioId } = req.query;
   if (coluna && !COLUNAS_VALIDAS.includes(coluna)) {
-    return res.status(400).json({ erro: 'Coluna inválida', colunasAceitas: COLUNAS_VALIDAS });
+    throw criarErro(400, 'Coluna inválida');
   }
 
-  const todas = tarefaModel.listar();
-  const tarefasFiltradas = (projetoId ? tarefaModel.listarPorProjeto(Number(projetoId)) : todas).filter(
-    (t) => !coluna || t.coluna === coluna
+  const todas = await tarefaModel.listarAcessiveis(req.usuario);
+  const tarefasFiltradas = todas.filter(
+    (t) => (!coluna || t.coluna === coluna)
+      && (!projetoId || t.projetoId === Number(projetoId))
+      && (!usuarioId || t.usuarioId === Number(usuarioId)),
   );
 
   const porColuna = {
@@ -254,23 +258,28 @@ function estatisticas(req, res) {
     concluido: tarefasFiltradas.filter((t) => t.coluna === 'concluido').length,
   };
 
-  const porPrioridade = contarPorPrioridade(tarefasFiltradas);
+  const porPrioridade = await contarPorPrioridade(tarefasFiltradas);
 
-  // Nível 2A: ranking de usuários
-  const usuarios = usuarioModel.listar();
+  const usuarios = (await usuarioModel.listar()).filter(
+    (u) => req.usuario.administrador || u.id === req.usuario.id,
+  );
   const rankingUsuarios = usuarios
     .map((u) => ({
       usuarioId: u.id,
       nome: u.nome,
-      totalTarefas: todas.filter((t) => t.usuarioId === u.id).length,
+      totalTarefas: tarefasFiltradas.filter((t) => t.usuarioId === u.id).length,
     }))
     .sort((a, b) => b.totalTarefas - a.totalTarefas);
 
   const usuarioComMaisTarefas =
-    rankingUsuarios.length > 0 && rankingUsuarios[0].totalTarefas > 0 ? rankingUsuarios[0].nome : null;
+    rankingUsuarios.length > 0 && rankingUsuarios[0].totalTarefas > 0
+      ? rankingUsuarios[0].nome
+      : null;
 
   res.json({
-    filtro: (coluna || projetoId) ? { coluna: coluna || null, projetoId: projetoId || null } : null,
+    filtro: coluna || projetoId || usuarioId
+      ? { coluna: coluna || null, projetoId: projetoId || null, ...(usuarioId ? { usuarioId } : {}) }
+      : null,
     total: tarefasFiltradas.length,
     porColuna,
     porPrioridade,
@@ -281,12 +290,12 @@ function estatisticas(req, res) {
   });
 }
 
-function resumo(req, res) {
-  const todas = tarefaModel.listar();
+async function resumo(req, res) {
+  const todas = await tarefaModel.listarAcessiveis(req.usuario);
   const afazer = todas.filter((t) => t.coluna === 'afazer').length;
   const andamento = todas.filter((t) => t.coluna === 'andamento').length;
   const concluido = todas.filter((t) => t.coluna === 'concluido').length;
-  const contagemPrioridade = contarPorPrioridade(todas);
+  const contagemPrioridade = await contarPorPrioridade(todas);
   const prioridadeMaisComum = valorMaisComum(contagemPrioridade);
 
   res.json({

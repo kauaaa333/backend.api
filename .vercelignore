@@ -1,0 +1,11 @@
+# Credenciais são fornecidas apenas pelas variáveis de ambiente da Vercel.
+.env
+.env.*
+**/.env
+**/.env.*
+.git
+node_modules
+tmp
+test
+*.test.js
+postman

@@ -1,71 +1,78 @@
+const criarErro = require('../utils/criarErro');
+const { podeAcessar } = require('../utils/acesso');
 const usuarioModel = require('../models/usuario.model');
 const tarefaModel = require('../models/tarefa.model');
 
-function listar(req, res) {
-  res.json(usuarioModel.listar());
+async function listar(req, res) {
+  res.json(
+    (await usuarioModel.listar()).filter(
+      (u) => req.usuario.administrador || u.id === req.usuario.id,
+    ),
+  );
 }
 
-function buscarPorId(req, res) {
+async function buscarPorId(req, res) {
   const id = Number(req.params.id);
-  const usuario = usuarioModel.buscar(id);
-  if (!usuario) {
-    return res.status(404).json({ erro: 'Usuário não encontrado' });
+  const usuario = await usuarioModel.buscar(id);
+  if (!usuario || !podeAcessar(req.usuario, usuario, 'id')) {
+    throw criarErro(404, 'Usuário não encontrado');
   }
   res.json(usuario);
 }
 
-function criar(req, res) {
+async function criar(req, res) {
   const { nome, email, senha } = req.body;
   if (!nome || !email) {
-    return res.status(400).json({ erro: 'Nome e e-mail são obrigatórios' });
+    throw criarErro(400, 'Nome e e-mail são obrigatórios');
   }
 
   const emailFormatado = email.trim().toLowerCase();
-  if (usuarioModel.buscarPorEmail(emailFormatado)) {
-    return res.status(409).json({ erro: 'E-mail já cadastrado' });
+  if (await usuarioModel.buscarPorEmail(emailFormatado)) {
+    throw criarErro(409, 'E-mail já cadastrado', ['Valor repetido em: email']);
   }
 
-  const novoUsuario = usuarioModel.adicionar({ nome, email: emailFormatado, senha });
+  const novoUsuario = await usuarioModel.adicionar({ nome, email: emailFormatado, senha });
   res.status(201).json(novoUsuario);
 }
 
-function atualizar(req, res) {
+async function atualizar(req, res) {
   const id = Number(req.params.id);
-  const usuarioExistente = usuarioModel.buscar(id);
-  if (!usuarioExistente) {
-    return res.status(404).json({ erro: 'Usuário não encontrado' });
+  const usuarioExistente = await usuarioModel.buscar(id);
+  if (!usuarioExistente || !podeAcessar(req.usuario, usuarioExistente, 'id')) {
+    throw criarErro(404, 'Usuário não encontrado');
   }
 
   const { nome, email, senha } = req.body;
   if (!nome || !email) {
-    return res.status(400).json({ erro: 'Nome e e-mail são obrigatórios' });
+    throw criarErro(400, 'Nome e e-mail são obrigatórios');
   }
 
   const emailFormatado = email.trim().toLowerCase();
-  const usuarioComEmail = usuarioModel.buscarPorEmail(emailFormatado);
+  const usuarioComEmail = await usuarioModel.buscarPorEmail(emailFormatado);
   if (usuarioComEmail && usuarioComEmail.id !== id) {
-    return res.status(409).json({ erro: 'E-mail já cadastrado' });
+    throw criarErro(409, 'E-mail já cadastrado', ['Valor repetido em: email']);
   }
 
   const dados = { ...req.body, email: emailFormatado };
-  const atualizado = usuarioModel.atualizar(id, dados);
+  const atualizado = await usuarioModel.atualizar(id, dados);
+  if (!atualizado) throw criarErro(404, 'Usuário não encontrado');
   res.json(atualizado);
 }
 
-function remover(req, res) {
+async function remover(req, res) {
   const id = Number(req.params.id);
-  const usuario = usuarioModel.buscar(id);
-  if (!usuario) {
-    return res.status(404).json({ erro: 'Usuário não encontrado' });
+  const usuario = await usuarioModel.buscar(id);
+  if (!usuario || !podeAcessar(req.usuario, usuario, 'id')) {
+    throw criarErro(404, 'Usuário não encontrado');
   }
 
-  const tarefasDoUsuario = tarefaModel.listar().filter((t) => t.usuarioId === id);
+  const tarefasDoUsuario = (await tarefaModel.listar()).filter((t) => t.usuarioId === id);
   if (tarefasDoUsuario.length > 0) {
-    return res.status(400).json({ erro: 'Usuário possui tarefas. Remova as tarefas antes.' });
+    throw criarErro(409, 'Usuário possui tarefas. Remova as tarefas antes.');
   }
 
-  const removido = usuarioModel.remover(id);
-  res.json({ mensagem: 'Usuário removido com sucesso', id: removido.id, usuario: removido });
+  if (!(await usuarioModel.remover(id))) throw criarErro(404, 'Usuário não encontrado');
+  res.status(204).end();
 }
 
 module.exports = {

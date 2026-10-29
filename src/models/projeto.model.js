@@ -1,33 +1,42 @@
-let projetos = [
-  { id: 1, nome: 'TaskFlow MVP', descricao: 'Desenvolvimento do MVP da TaskFlow API' },
-  { id: 2, nome: 'Docs UC12', descricao: 'Documentação das aulas da UC12' },
-];
-
-let proximoId = 3;
-
+const prisma = require('../database/prisma');
+const formatar = require('../database/formatar');
+const registroOuNull = require('../database/operacao');
+const buscar = async (id) =>
+  formatar(await prisma.projetos.findUnique({ where: { id } }));
 module.exports = {
-  listar: () => projetos,
-  buscar: (id) => projetos.find((p) => p.id === id),
-  buscarPorId: (id) => projetos.find((p) => p.id === id),
-  buscarPorNome: (nome) => (nome ? projetos.find((p) => p.nome.toLowerCase() === nome.toLowerCase().trim()) : undefined),
-  adicionar: ({ nome, descricao }) => {
-    const novo = {
-      id: proximoId++,
-      nome,
-      descricao: descricao || null,
-    };
-    projetos.push(novo);
-    return novo;
-  },
-  atualizar: (id, dados) => {
-    const idx = projetos.findIndex((p) => p.id === id);
-    if (idx === -1) return null;
-    projetos[idx] = { ...projetos[idx], ...dados, id };
-    return projetos[idx];
-  },
-  remover: (id) => {
-    const idx = projetos.findIndex((p) => p.id === id);
-    if (idx === -1) return null;
-    return projetos.splice(idx, 1)[0];
-  },
+  listar: async () =>
+    (
+      await prisma.projetos.findMany({
+        orderBy: [{ nome: 'asc' }, { id: 'asc' }],
+      })
+    ).map(formatar),
+  buscar,
+  buscarPorId: buscar,
+  buscarPorNome: (nome) =>
+    prisma.projetos.findFirst({
+      where: { nome: { equals: nome.trim(), mode: 'insensitive' } },
+      select: { id: true, nome: true },
+    }),
+  adicionar: async ({ nome, descricao, usuarioId }) =>
+    formatar(
+      await prisma.projetos.create({
+        data: { nome: nome.trim(), descricao, usuario_id: Number(usuarioId) },
+      }),
+    ),
+  atualizar: (id, { nome, descricao }) =>
+    registroOuNull(async () =>
+      formatar(
+        await prisma.projetos.update({
+          where: { id },
+          data: {
+            ...(nome !== undefined ? { nome: nome.trim() } : {}),
+            descricao,
+          },
+        }),
+      ),
+    ),
+  remover: (id) =>
+    registroOuNull(async () =>
+      formatar(await prisma.projetos.delete({ where: { id } })),
+    ),
 };

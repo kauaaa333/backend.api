@@ -1,23 +1,26 @@
+const criarErro = require('../utils/criarErro');
 const jwt = require('jsonwebtoken');
 const usuarioModel = require('../models/usuario.model');
+const { producao, senhaAceita } = require('../utils/politicaSenha');
 
 const authController = {
-  login(req, res) {
+  async login(req, res) {
     const { email, senha } = req.body || {};
 
     if (!email || !senha) {
-      return res.status(400).json({ erro: 'Email e senha são obrigatórios' });
+      throw criarErro(400, 'Email e senha são obrigatórios');
     }
 
-    const usuario = usuarioModel.buscarPorEmail(email);
-    if (!usuario || usuario.senha !== senha) {
-      return res.status(401).json({ erro: 'Credenciais inválidas' });
+    if (producao() && !senhaAceita(senha)) throw criarErro(401, 'Credenciais inválidas');
+    const usuario = await usuarioModel.autenticar(email, senha);
+    if (!usuario) {
+      throw criarErro(401, 'Credenciais inválidas');
     }
 
     const token = jwt.sign(
-      { id: usuario.id, nome: usuario.nome },
+      { id: usuario.id, nome: usuario.nome, versaoUsuarios: 'neon-v1', versaoSenha: usuario.versaoSenha },
       process.env.JWT_SECRET,
-      { expiresIn: '8h' }
+      { expiresIn: '8h' },
     );
 
     return res.json({
@@ -26,11 +29,11 @@ const authController = {
     });
   },
 
-  perfil(req, res) {
-    const usuario = usuarioModel.buscarPorId(req.usuario.id);
+  async perfil(req, res) {
+    const usuario = await usuarioModel.buscarPorId(req.usuario.id);
 
     if (!usuario) {
-      return res.status(404).json({ erro: 'Usuário não encontrado' });
+      throw criarErro(404, 'Usuário não encontrado');
     }
 
     return res.json({ id: usuario.id, nome: usuario.nome, email: usuario.email });
