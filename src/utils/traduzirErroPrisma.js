@@ -2,9 +2,7 @@ const criarErro = require('./criarErro');
 const { Prisma } = require('@prisma/client');
 
 module.exports = function traduzirErroPrisma(erro, metodo) {
-  // Prisma 6 envolve ON DELETE RESTRICT (SQLSTATE 23001) como erro
-  // desconhecido, sem code/meta estruturados. Reconhecer só essa assinatura
-  // tipada, observada no Neon, sem modificar a constraint nem expor o texto.
+  // Prisma 6 retorna RESTRICT (SQLSTATE 23001) sem code/meta estruturados.
   if (
     erro instanceof Prisma.PrismaClientUnknownRequestError &&
     /PostgresError\s*\{\s*code:\s*"23001"/.test(erro.message)

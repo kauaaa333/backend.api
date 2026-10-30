@@ -1,69 +1,76 @@
 # TaskFlow API
 
-API Express 5 com Prisma 6 e PostgreSQL/Neon. Frontend: https://task-flow-gamma-inky.vercel.app. API: https://backend-api-black-seven.vercel.app.
+Backend do TaskFlow com Node.js, Express, Prisma e PostgreSQL.
 
-## Configuração local
+[Aplicação](https://task-flow-gamma-inky.vercel.app/) · [Swagger](https://backend-api-black-seven.vercel.app/docs/) · [Frontend](https://github.com/kauaaa333/TaskFlow)
 
-Instale com `npm ci`. Configure `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET` e `CORS_ORIGIN` em `.env` (nunca no Git). Use uma branch de desenvolvimento, não o banco de produção. Inicie com `npm run dev`.
+## Executar
 
-- `DATABASE_URL`: conexão pooled da branch escolhida, com TLS verificado.
-- `DIRECT_URL`: conexão direta da mesma branch para introspecção.
-- `JWT_SECRET`: valor aleatório forte, no mínimo 32 caracteres em produção.
-- `TASKFLOW_PRODUCTION_SECURITY=true`: obrigatório na produção; exige senhas de pelo menos 12 caracteres e até 72 bytes. As credenciais didáticas não são aceitas.
+Requer Node.js 22 e PostgreSQL.
 
-O schema já existe. Não executar `db push`, `migrate reset` ou scripts de teste no banco real. `npm run prisma:generate` apenas gera o cliente; `npm run prisma:pull` lê a estrutura.
+```sh
+npm ci
+npm run dev
+```
 
-## Segurança e acesso
+Configure em `.env`:
 
-A tela de login não publica credenciais. Contas existentes e seus dados foram preservados. O administrador de produção é provisionado explicitamente por um operador com acesso ao banco; não há promoção de permissões pelo body ou pelo JWT.
+| Variável | Uso |
+| --- | --- |
+| `DATABASE_URL` | Conexão PostgreSQL; endereço pooled no Neon |
+| `DIRECT_URL` | Conexão direta com o mesmo banco |
+| `JWT_SECRET` | Chave aleatória para assinar tokens |
+| `CORS_ORIGIN` | Endereço do frontend |
+| `PORT` ou `PORTA` | Porta da API; padrão 3000 |
+| `TASKFLOW_PRODUCTION_SECURITY` | Use `true` em produção |
 
-`scripts/provisionar-admin.cjs` cria somente uma conta nova, após confirmação do host em `.env.admin.local`. Esse arquivo contém a senha inicial e é ignorado pelo Git/Vercel. Não compartilhe o arquivo, não faça screenshots dele e não coloque a senha em issues ou logs.
+Use um banco separado para desenvolvimento. Não versione senhas, tokens, arquivos `.env` ou backups.
 
-Para redefinir uma senha sem exibi-la no terminal:
+## API
+
+Recursos: autenticação, tarefas, projetos, usuários, prioridades, comentários e estatísticas.
+
+Usuários comuns acessam seus próprios registros. Administradores podem gerenciar os registros dos demais usuários. O perfil é consultado no banco em cada requisição.
+
+A criação de contas exige autenticação e não concede administração. Administradores são provisionados pelo operador do sistema.
+
+Consulte `/docs/` para os parâmetros e respostas. As rotas protegidas recebem `Authorization: Bearer TOKEN`; no botão **Authorize**, informe somente o token. O Swagger executa requisições reais: POST, PUT e DELETE podem alterar o banco.
+
+## Estrutura
+
+- `src/routes`: rotas HTTP.
+- `src/controllers`: requisições e regras de acesso.
+- `src/models`: consultas e gravações.
+- `src/middlewares`: autenticação, validação e erros.
+- `src/docs`: OpenAPI.
+- `prisma/schema.prisma`: mapeamento do banco.
+- `test`: testes e preparação do banco isolado.
+
+## Testes
+
+```sh
+npm test
+npm run test:uc14
+npm audit
+```
+
+Os testes de integração exigem `TEST_DATABASE_URL`, `TEST_APP_DATABASE_URL` e `TEST_DATABASE_EXPECTED_HOST` em `.env.test.local`. As fixtures limpam essa base; use um ambiente descartável.
+
+O GitHub Actions usa PostgreSQL temporário. A coleção Postman está em `postman/`. O runner `scripts/run-postman.cjs` usa Newman instalado separadamente em `tmp/postman-runner`:
+
+```sh
+npm install --prefix=tmp/postman-runner --no-save --package-lock=false newman@6.2.3
+node scripts/run-postman.cjs
+```
+
+## Manutenção
+
+Consulte [PRISMA.md](PRISMA.md), [NEON.md](NEON.md) e [RECUPERACAO.md](RECUPERACAO.md).
+
+Para redefinir uma senha com entrada oculta:
 
 ```powershell
 ./scripts/definir-senha.ps1 -Email EMAIL_DA_CONTA
 ```
 
-A troca invalida sessões antigas pela versão da senha verificada no banco. Uma rotação de `JWT_SECRET` invalida todas as sessões. Cookies/token não concedem o perfil de administrador: ele é consultado no banco em cada requisição.
-
-## Documentação interativa (UC14 — Dia 9)
-
-Acesse https://backend-api-black-seven.vercel.app/docs/ ou `/docs/` no servidor local. A especificação OpenAPI 3.0.3 está em `/docs/openapi.json`. São 27 operações, organizadas por recurso em `src/docs/`.
-
-Ler a documentação não exige login. Para testar operações protegidas, faça login na sua conta, copie o token e use **Authorize** (somente o token, sem `Bearer`). As permissões continuam sendo verificadas pelo backend. O token não é persistido pelo Swagger; nenhum validador externo recebe a especificação.
-
-**Atenção:** `Try it out` executa requisições reais no servidor atual. POST, PUT e DELETE podem alterar o banco de produção. Use uma conta própria e registros descartáveis ou prefira um servidor de desenvolvimento ligado ao banco isolado. Nunca publique tokens, senhas ou respostas de login em screenshots/relatórios.
-
-Os exemplos do slide foram adaptados ao contrato existente: camelCase, somente `texto` obrigatório na criação de tarefa, PUT parcial de tarefa/projeto e DELETE 204. Usuários exigem token; o cadastro autenticado cria apenas contas comuns, sem conceder administração. O teste `test/docs.test.js` valida o OpenAPI, a cobertura das rotas e os recursos da interface.
-
-## Testes
-
-```text
-node scripts/check-secrets.cjs
-npm audit --audit-level=high
-npm test
-```
-
-Os testes de integração exigem `TEST_DATABASE_URL`, `TEST_APP_DATABASE_URL` e `TEST_DATABASE_EXPECTED_HOST` em `.env.test.local`, apontando à mesma branch isolada descartável. A fixture limpa SOMENTE esse destino, após conferir o host e rejeitar o host da aplicação. A política de senhas de demonstração é permitida somente nos testes.
-
-O GitHub Actions prepara PostgreSQL efêmero próprio, inclui constraints/triggers/funções necessários e roda a suite completa sem credenciais ou dados do Neon. Mudanças em `main` e pull requests acionam o workflow.
-
-O verificador de segredos bloqueia padrões conhecidos e arquivos `.env` candidatos ao Git; não substitui revisão nem detecção especializada de segredos.
-
-## Postman / Newman
-
-A coleção e os ambientes estão em `postman/`, sem credenciais. Para execução local reproduzível, o Newman oficial é instalado como ferramenta temporária, fora das dependências publicadas da API:
-
-```text
-npm install --prefix=tmp/postman-runner --no-save --package-lock=false newman@6.2.3
-node scripts/run-postman.cjs
-```
-
-O Newman 6 utiliza bibliotecas legadas; é ferramenta de validação de uma coleção confiável, não dependência da aplicação. `tmp/` não vai ao Git nem à Vercel. Relatórios sanitizados guardam apenas contagens e nomes das verificações, sem requests, senhas ou tokens.
-
-Por padrão, o runner usa a API local da porta 3002. Para produção, exige autorização explícita `TASKFLOW_POSTMAN_ALLOW_PRODUCTION=true`, o endereço principal em `TASKFLOW_POSTMAN_BASE_URL` e as credenciais privadas de operador em `.env.admin.local`. A coleção cria e exclui registros temporários; deve ser executada inteira e os resíduos devem ser conferidos ao final.
-
-## Recuperação
-
-Consulte [RECUPERACAO.md](RECUPERACAO.md), [PRISMA.md](PRISMA.md) e os relatórios de validação. Backups e chaves nunca são versionados. `NEON.md` e os relatórios anteriores registram etapas históricas; o estado mais recente está em `VALIDACAO_FINAL.md`.
+Trocar a senha invalida as sessões anteriores. Em produção, são exigidos ao menos 12 caracteres e no máximo 72 bytes.

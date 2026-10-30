@@ -20,8 +20,6 @@ Remove-Item Env:TASKFLOW_ALLOW_TEST_RESTORE
 
 O ensaio usa `TEST_DATABASE_URL` e `TEST_DATABASE_EXPECTED_HOST`. Recusa o host da origem e destinos fora da branch isolada confirmada. Substitui os dados SOMENTE desse ambiente descartável, preservando datas, histórico e sequências. A comparação SHA-256 do conteúdo de todas as tabelas deve coincidir antes do commit; divergência causa rollback. Os testes da API depois recriam suas fixtures, removendo os dados restaurados do ambiente de testes.
 
-Em 29/10/2026 foi verificado um backup com 9 usuários (incluindo a nova conta administradora), 5 prioridades, 5 projetos, 11 tarefas, 4 comentários e 28 eventos. A restauração isolada resultou no mesmo digest e nas mesmas contagens. Nenhuma restauração foi feita sobre produção.
-
 ## Recuperação real
 
 1. Interromper novas gravações e identificar o último backup/snapshot íntegro.
