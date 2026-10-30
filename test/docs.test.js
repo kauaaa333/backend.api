@@ -4,6 +4,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const parser = require('@apidevtools/swagger-parser');
 const spec = require('../src/docs/openapi');
+// Estes testes não consultam banco. O Prisma precisa de URL válida apenas para
+// inicializar; o CI não distribui .env e cada arquivo roda em processo próprio.
+process.env.DATABASE_URL ||= process.env.TEST_APP_DATABASE_URL || 'postgresql://docs:docs@127.0.0.1:5432/docs_unused';
 const app = require('../server');
 let server, base;
 before(async () => { server = app.listen(0); await new Promise(r => server.once('listening', r)); base = `http://127.0.0.1:${server.address().port}`; });
