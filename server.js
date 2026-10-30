@@ -19,6 +19,8 @@ const criarErro = require('./src/utils/criarErro');
 const tratarErros = require('./src/middlewares/erro.middleware');
 
 const app = express();
+const swaggerUi = require('swagger-ui-express');
+const openapi = require('./src/docs/openapi');
 const PORTA = process.env.PORT || process.env.PORTA || 3000;
 const origensPermitidas = [
   'http://localhost:5173',
@@ -43,6 +45,12 @@ app.use(express.json());
 app.use(temporizador);
 app.use(validarContentType);
 app.use(logger);
+
+app.get('/docs/openapi.json', (req, res) => res.json(openapi));
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(openapi, {
+  swaggerOptions: { validatorUrl: null, persistAuthorization: false, tryItOutEnabled: false, docExpansion: 'none' },
+  customSiteTitle: 'TaskFlow API — documentação',
+}));
 
 app.use('/auth', authRoutes);
 app.use('/tarefas', autenticar, tarefasRoutes);

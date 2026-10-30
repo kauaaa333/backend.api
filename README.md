@@ -27,7 +27,17 @@ Para redefinir uma senha sem exibi-la no terminal:
 
 A troca invalida sessões antigas pela versão da senha verificada no banco. Uma rotação de `JWT_SECRET` invalida todas as sessões. Cookies/token não concedem o perfil de administrador: ele é consultado no banco em cada requisição.
 
-## Validação
+## Documentação interativa (UC14 — Dia 9)
+
+Acesse https://backend-api-black-seven.vercel.app/docs/ ou `/docs/` no servidor local. A especificação OpenAPI 3.0.3 está em `/docs/openapi.json`. São 27 operações, organizadas por recurso em `src/docs/`.
+
+Ler a documentação não exige login. Para testar operações protegidas, faça login na sua conta, copie o token e use **Authorize** (somente o token, sem `Bearer`). As permissões continuam sendo verificadas pelo backend. O token não é persistido pelo Swagger; nenhum validador externo recebe a especificação.
+
+**Atenção:** `Try it out` executa requisições reais no servidor atual. POST, PUT e DELETE podem alterar o banco de produção. Use uma conta própria e registros descartáveis ou prefira um servidor de desenvolvimento ligado ao banco isolado. Nunca publique tokens, senhas ou respostas de login em screenshots/relatórios.
+
+Os exemplos do slide foram adaptados ao contrato existente: camelCase, somente `texto` obrigatório na criação de tarefa, PUT parcial de tarefa/projeto e DELETE 204. Usuários exigem token; o cadastro autenticado cria apenas contas comuns, sem conceder administração. O teste `test/docs.test.js` valida o OpenAPI, a cobertura das rotas e os recursos da interface.
+
+## Testes
 
 ```text
 node scripts/check-secrets.cjs

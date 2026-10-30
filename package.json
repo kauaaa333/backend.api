@@ -6,7 +6,7 @@
     "postinstall": "prisma generate",
     "prisma:pull": "prisma db pull",
     "prisma:generate": "prisma generate",
-    "test": "node --test server.test.js test/uc14.test.js test/prisma.test.js test/seguranca.test.js",
+    "test": "node --test server.test.js test/uc14.test.js test/prisma.test.js test/seguranca.test.js test/docs.test.js",
     "test:uc14": "node --test test/uc14.test.js",
     "dev": "nodemon server.js",
     "start": "node server.js"
@@ -22,9 +22,11 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
-    "pg": "^8.23.1"
+    "pg": "^8.23.1",
+    "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
+    "@apidevtools/swagger-parser": "^13.0.0",
     "nodemon": "^3.1.14",
     "prisma": "6.19.3"
   },
