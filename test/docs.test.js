@@ -43,9 +43,10 @@ test('Página, JSON e recursos Swagger acessíveis sem login', async () => {
   const json = await fetch(base + '/docs/openapi.json');
   assert.equal(json.status, 200);
   assert.deepEqual(await json.json(), spec);
-  for (const file of ['swagger-ui.css', 'swagger-ui-bundle.js', 'swagger-ui-init.js']) {
+  for (const file of ['swagger-ui.css', 'swagger-ui-bundle.js', 'swagger-ui-standalone-preset.js', 'swagger-ui-init.js']) {
     const r = await fetch(base + '/docs/' + file);
     assert.equal(r.status, 200, file);
+    assert.match(r.headers.get('content-type'), file.endsWith('.css') ? /text\/css/ : /javascript/, file);
     assert.ok((await r.text()).length > 100, file);
   }
 });

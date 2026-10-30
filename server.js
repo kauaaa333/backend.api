@@ -47,6 +47,18 @@ app.use(validarContentType);
 app.use(logger);
 
 app.get('/docs/openapi.json', (req, res) => res.json(openapi));
+// Referências estáticas explícitas permitem que o empacotador serverless inclua
+// estes arquivos; express.static com diretório dinâmico não basta na Vercel.
+const arquivosSwagger = {
+  'swagger-ui.css': require.resolve('swagger-ui-dist/swagger-ui.css'),
+  'swagger-ui-bundle.js': require.resolve('swagger-ui-dist/swagger-ui-bundle.js'),
+  'swagger-ui-standalone-preset.js': require.resolve('swagger-ui-dist/swagger-ui-standalone-preset.js'),
+  'favicon-16x16.png': require.resolve('swagger-ui-dist/favicon-16x16.png'),
+  'favicon-32x32.png': require.resolve('swagger-ui-dist/favicon-32x32.png'),
+};
+for (const [nome, arquivo] of Object.entries(arquivosSwagger)) {
+  app.get(`/docs/${nome}`, (req, res) => res.sendFile(arquivo));
+}
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(openapi, {
   swaggerOptions: { validatorUrl: null, persistAuthorization: false, tryItOutEnabled: false, docExpansion: 'none' },
   customSiteTitle: 'TaskFlow API — documentação',

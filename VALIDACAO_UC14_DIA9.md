@@ -10,6 +10,7 @@ Material analisado: `UC14_Dia9_Swagger.pdf`, 27 páginas. O material foi usado c
 - Servidor relativo à origem atual, para funcionar tanto localmente quanto na Vercel sem enviar tokens para outro host.
 - Autorização não persistida e validador externo desabilitado; aviso sobre os efeitos reais de Try it out.
 - Testes verificam a especificação com parser OpenAPI, todas as operações reais dos arquivos de rotas, recursos HTML/CSS/JS, autenticação e contratos principais.
+- Arquivos CSS/JS e favicons referenciados explicitamente para o empacotamento serverless da Vercel. Retornar HTML no lugar de JS não é aceito como sucesso no teste de recursos.
 
 ## Adaptações necessárias em relação ao slide
 
