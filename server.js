@@ -57,7 +57,9 @@ const arquivosSwagger = {
   'favicon-32x32.png': require.resolve('swagger-ui-dist/favicon-32x32.png'),
 };
 for (const [nome, arquivo] of Object.entries(arquivosSwagger)) {
-  app.get(`/docs/${nome}`, (req, res) => res.sendFile(arquivo));
+  // A raiz do workspace Windows contém .vscode-shared. A opção vale somente
+  // para estes caminhos fixos de dependências, nunca para entrada do usuário.
+  app.get(`/docs/${nome}`, (req, res) => res.sendFile(arquivo, { dotfiles: 'allow' }));
 }
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(openapi, {
   swaggerOptions: { validatorUrl: null, persistAuthorization: false, tryItOutEnabled: false, docExpansion: 'none' },
