@@ -39,6 +39,11 @@ test('Contrato usa nomes reais, PUT parcial, exclusão 204 e schemas públicos s
   assert.deepEqual(spec.paths['/auth/login'].post.security, []);
   assert.deepEqual(spec.security, [{ bearerAuth: [] }]);
 });
+test('Raiz pública responde com a mensagem de status da API', async () => {
+  const resposta = await fetch(base + '/');
+  assert.equal(resposta.status, 200);
+  assert.deepEqual(await resposta.json(), { mensagem: 'TaskFlow API funcionando!' });
+});
 test('Página, JSON e recursos Swagger acessíveis sem login', async () => {
   const page = await fetch(base + '/docs/');
   assert.equal(page.status, 200);

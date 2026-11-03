@@ -46,6 +46,8 @@ app.use(temporizador);
 app.use(validarContentType);
 app.use(logger);
 
+app.get('/', (_req, res) => res.json({ mensagem: 'TaskFlow API funcionando!' }));
+
 app.get('/docs/openapi.json', (req, res) => res.json(openapi));
 // Referências estáticas explícitas permitem que o empacotador serverless inclua
 // estes arquivos; express.static com diretório dinâmico não basta na Vercel.
