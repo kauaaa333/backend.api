@@ -1,5 +1,5 @@
 const prisma = require("../database/prisma");
-const select = { id: true, descricao: true, ativo: true };
+const select = { id: true, descricao: true, ativo: true, cor: true };
 module.exports = {
   listar: () =>
     prisma.prioridades.findMany({

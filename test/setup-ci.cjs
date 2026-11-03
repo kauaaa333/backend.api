@@ -21,6 +21,7 @@ async function main() {
     await pool.query('GRANT SELECT,INSERT ON auditoria_tarefas TO app_usuario');
     await pool.query('GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA public TO app_usuario');
     await pool.query("INSERT INTO prioridades(id,descricao,ativo) VALUES(1,'baixissima',true),(2,'baixa',true),(3,'media',true),(4,'alta',true),(5,'urgente',true)");
+    await pool.query(fs.readFileSync(path.join(__dirname, '../sql/prioridades-cor.sql'), 'utf8'));
     console.log('Banco CI preparado sem dados de produção.');
   } finally { await pool.end(); }
 }

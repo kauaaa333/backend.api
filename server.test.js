@@ -1109,6 +1109,28 @@ test('Segurança — token de conta removida não continua válido', async () =>
   assert.equal((await requisicao('GET', '/prioridades', undefined, login.body.token)).status, 401);
 });
 
+test('A cor alterada no PostgreSQL aparece na prioridade e na tarefa sem reiniciar a API', async () => {
+  const { Pool } = require('pg');
+  const pool = new Pool({ connectionString: process.env.TEST_DATABASE_URL });
+  const { rows: [anterior] } = await pool.query('SELECT cor FROM prioridades WHERE id=3');
+  const cor = anterior.cor === '#8B5CF6' ? '#16A34A' : '#8B5CF6';
+  let id;
+  try {
+    const criada = await requisicao('POST', '/tarefas', { texto: 'Cor dinâmica', idprioridade: 3 });
+    assert.equal(criada.status, 201);
+    id = criada.body.id;
+    assert.equal(criada.body.prioridadeCor, anterior.cor);
+    await pool.query('UPDATE prioridades SET cor=$1 WHERE id=3', [cor]);
+    assert.equal((await requisicao('GET', '/prioridades')).body.find(p => p.id === 3).cor, cor);
+    assert.equal((await requisicao('GET', `/tarefas/${id}`)).body.prioridadeCor, cor);
+    await assert.rejects(pool.query("UPDATE prioridades SET cor='inval' WHERE id=3"), { code: '23514' });
+  } finally {
+    await pool.query('UPDATE prioridades SET cor=$1 WHERE id=3', [anterior.cor]);
+    await pool.end();
+    if (id) await requisicao('DELETE', `/tarefas/${id}`);
+  }
+});
+
 test('UC14 Dia 3 — prioridade inativa não aparece no select, mas a tarefa existente é preservada', async () => {
   const { Pool } = require('pg');
   const pool = new Pool({ connectionString: process.env.TEST_DATABASE_URL });

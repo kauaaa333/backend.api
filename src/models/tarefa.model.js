@@ -7,7 +7,7 @@ const { podeAcessar } = require('../utils/acesso');
 const include = {
   projetos: { select: { nome: true } },
   usuarios: { select: { nome: true } },
-  prioridades: { select: { descricao: true } },
+  prioridades: { select: { descricao: true, cor: true } },
 };
 const listar = async (where) =>
   (

@@ -132,7 +132,7 @@ test('Formato público mantém nomes, campos camelCase e relações opcionais', 
       projeto_id: null,
       usuarios: { nome: 'Ana' },
       projetos: null,
-      prioridades: { descricao: 'alta' },
+      prioridades: { descricao: 'alta', cor: '#EF4444' },
     }),
     {
       id: 1,
@@ -141,6 +141,7 @@ test('Formato público mantém nomes, campos camelCase e relações opcionais', 
       usuario: 'Ana',
       projeto: null,
       prioridade: 'alta',
+      prioridadeCor: '#EF4444',
     },
   );
 });

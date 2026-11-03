@@ -14,6 +14,7 @@ module.exports = {
     TarefaAtualizacao: { ...entrada, minProperties: 1, description: 'PUT parcial: envie pelo menos um campo reconhecido. Campos omitidos são preservados.' },
     Tarefa: { type: 'object', properties: { id, ...propriedades,
       usuario: { type: 'string', nullable: true }, projeto: { type: 'string', nullable: true }, prioridade: { type: 'string' },
+      prioridadeCor: { type: 'string', nullable: true, pattern: '^#[0-9A-Fa-f]{6}$', example: '#EAB308' },
       criadoEm: data, atualizadoEm: data, iniciadaEm: { ...data, nullable: true }, concluidaEm: { ...data, nullable: true },
     } },
     ResumoTarefas: { type: 'object', properties: { resumo: { type: 'string' } } },

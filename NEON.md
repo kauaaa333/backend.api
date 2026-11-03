@@ -24,4 +24,6 @@ Use uma branch descartável para testes. Configure `TEST_DATABASE_URL`, `TEST_AP
 
 Os scripts em `sql/` registram alterações anteriores. Não execute novamente sem revisar o estado do banco.
 
+`sql/prioridades-cor.sql` acrescenta a cor das prioridades e valida o formato `#RRGGBB`. Aplique primeiro no banco isolado e depois no banco de produção, antes de publicar a API que lê a coluna. O script preserva cores já preenchidas. O frontend recebe `cor` em `GET /prioridades` e `prioridadeCor` nas tarefas.
+
 Para backup e recuperação, consulte [RECUPERACAO.md](RECUPERACAO.md). O agendamento de backups externos ainda precisa ser configurado.
