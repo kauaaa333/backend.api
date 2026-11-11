@@ -63,6 +63,27 @@ npm install --prefix=tmp/postman-runner --no-save --package-lock=false newman@6.
 node scripts/run-postman.cjs
 ```
 
+### Execução de 09/11/2026
+
+Versões testadas: backend `edea78a` e frontend `d6384b7`.
+
+| Verificação | Resultado |
+| --- | --- |
+| Backend, incluindo integração com banco isolado | 89 testes aprovados |
+| Frontend | 22 testes aprovados |
+| Lint e build do frontend | Sem erros |
+| Casos no navegador local | 7 aprovados e 1 bloqueado |
+
+No navegador, foram conferidos o redirecionamento para login sem sessão, a entrada como visitante, a descrição vazia ou só com espaços, a criação de tarefa, a troca de projeto, a movimentação pelo controle “Mover para” e a exclusão. Criação, edição, movimentação e exclusão também foram conferidas após recarregar a página.
+
+Esses casos rodaram no Chromium, com o frontend local e o modo visitante. Os dados ficaram no navegador; esse resultado não comprova gravação no Neon. O backend foi testado separadamente, com uma base isolada.
+
+O CT-07, de login com senha incorreta no navegador, ficou bloqueado por falta de uma conta de teste disponível na execução. A aprovação foi de 87,5% dos oito casos planejados, abaixo dos 90% definidos na atividade. Ainda falta concluir esse caso e repetir o fluxo de tarefas com login no site publicado.
+
+Não foram encontrados novos defeitos nos sete casos executados. A atividade foi feita no próprio TaskFlow, sem execução cruzada com outro colega. Esses números são o registro daquela execução, não uma garantia sobre versões posteriores.
+
+Na primeira tentativa, suítes simultâneas interferiram nas fixtures da mesma base. A execução final, sem concorrência, passou nos 89 testes. Rode apenas uma suíte de integração por vez em cada banco de teste.
+
 ## Manutenção
 
 Consulte [PRISMA.md](PRISMA.md), [NEON.md](NEON.md) e [RECUPERACAO.md](RECUPERACAO.md).
