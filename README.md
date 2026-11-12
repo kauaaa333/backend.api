@@ -50,6 +50,8 @@ Consulte `/docs/` para os parâmetros e respostas. As rotas protegidas recebem `
 
 ```sh
 npm test
+npm run test:unit
+npm run test:watch
 npm run test:uc14
 npm audit
 ```
@@ -62,6 +64,26 @@ O GitHub Actions usa PostgreSQL temporário. A coleção Postman está em `postm
 npm install --prefix=tmp/postman-runner --no-save --package-lock=false newman@6.2.3
 node scripts/run-postman.cjs
 ```
+
+### Jest — Dia 3
+
+Os testes unitários da aula estão em `tests/`:
+
+- `criarErro.test.js`: status, mensagem e detalhes opcionais.
+- `traduzirErroPrisma.test.js`: P2002, P2003, P2025 e erro não tratado.
+- `exercicio.test.js`: os quatro casos extras do slide.
+
+`npm run test:unit` executa esses 12 testes sem banco nem conexão de rede. `npm test` roda o Jest e, depois, os testes anteriores com `node:test`. Para executar somente a suíte anterior, use `npm run test:regressao`. O GitHub Actions continua usando `npm test`, portanto também executa os novos testes.
+
+Para acompanhar alterações, use `npm run test:watch`. Para rodar um arquivo específico:
+
+```sh
+npx jest tests/criarErro.test.js --runInBand
+```
+
+No exercício de falha proposital, o esperado foi trocado de 404 para 400. O Jest apontou a diferença e retornou erro. Depois de restaurar 404, os 12 testes passaram. As funções da API não precisaram ser alteradas.
+
+Validação em 12/11/2026: 12 testes Jest e 89 testes da suíte anterior aprovados. A integração usou banco isolado, sem alterar produção. A auditoria das dependências de produção não encontrou vulnerabilidades; a árvore de desenvolvimento tem alertas baixos e moderados. Não foi aplicado o downgrade incompatível sugerido por `npm audit fix --force`.
 
 ### Execução de 09/11/2026
 
