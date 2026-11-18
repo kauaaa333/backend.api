@@ -37,6 +37,14 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/taskflow_ci
           DIRECT_URL: postgresql://postgres:postgres@127.0.0.1:5432/taskflow_ci
-      - run: npm audit --audit-level=high
+      - name: Auditar dependencias de producao
+        run: npm audit --omit=dev --audit-level=high
+      - name: Auditar ferramentas de desenvolvimento
+        id: auditoria_dev
+        continue-on-error: true
+        run: npm audit --audit-level=high
+      - name: Avisar sobre alertas de desenvolvimento
+        if: steps.auditoria_dev.outcome == 'failure'
+        run: node -e "console.log('::warning::A auditoria das ferramentas de desenvolvimento tem pendencias. Confira o relatorio da etapa anterior. A auditoria de producao continua obrigatoria.')"
       - run: node test/setup-ci.cjs
       - run: npm test

@@ -117,7 +117,9 @@ Para os testes HTTP com banco isolado:
 npm run test:integracao
 ```
 
-Auditoria em 18/11/2026: `npm audit --omit=dev` não apontou vulnerabilidades. A árvore de desenvolvimento apresentou 41 alertas (37 altos e 4 moderados), ligados às dependências transitivas de Jest e nodemon. `npm audit fix` foi executado, mas não eliminou os alertas. A etapa `npm audit --audit-level=high` faz a validação do CI falhar enquanto essa pendência existir; ela não foi removida nem flexibilizada.
+Auditoria em 18/11/2026: `npm audit --omit=dev` não apontou vulnerabilidades. A árvore de desenvolvimento apresentou 41 alertas (37 altos e 4 moderados), ligados às dependências transitivas de Jest e nodemon. `npm audit fix` foi executado, mas não eliminou os alertas.
+
+O CI separa as duas verificações. A auditoria de produção continua obrigatória e bloqueia vulnerabilidades altas ou críticas. A auditoria completa também roda, mas os alertas das ferramentas de desenvolvimento ficam como aviso e não impedem os testes. Essa política foi adotada enquanto o picomatch não tem uma versão corrigida publicada; não significa que a vulnerabilidade foi resolvida. Os detalhes continuam disponíveis no log do Actions.
 
 Validação dos Dias 4 a 6 em 18/11/2026: 49 testes sem banco, 7 testes Supertest com banco isolado e 89 testes da suíte anterior aprovados. Total: 145. As tarefas criadas pela integração foram removidas e o total de registros voltou ao valor inicial. Nenhum teste desta execução foi direcionado à API ou ao banco de produção.
 
