@@ -6,9 +6,10 @@
     "postinstall": "prisma generate",
     "prisma:pull": "prisma db pull",
     "prisma:generate": "prisma generate",
-    "test": "npm run test:unit && npm run test:regressao",
+    "test": "npm run test:unit && npm run test:integracao && npm run test:regressao",
     "test:unit": "jest --runInBand",
     "test:watch": "jest --watchAll",
+    "test:integracao": "jest --config jest.integracao.config.cjs --runInBand",
     "test:regressao": "node --test server.test.js test/uc14.test.js test/prisma.test.js test/seguranca.test.js test/docs.test.js",
     "test:uc14": "node --test test/uc14.test.js",
     "dev": "nodemon server.js",
@@ -32,7 +33,8 @@
     "@apidevtools/swagger-parser": "^13.0.0",
     "jest": "^30.5.2",
     "nodemon": "^3.1.14",
-    "prisma": "6.19.3"
+    "prisma": "6.19.3",
+    "supertest": "^7.3.2"
   },
   "overrides": {
     "@prisma/config": {

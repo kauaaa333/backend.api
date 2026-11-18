@@ -1,24 +1,8 @@
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 module.exports = async function prepararBancoDeTeste() {
-  require('dotenv').config({ path: '.env.test.local', quiet: true });
-  const url = process.env.TEST_DATABASE_URL;
-  if (
-    !url ||
-    !process.env.TEST_DATABASE_EXPECTED_HOST ||
-    new URL(url).hostname !== process.env.TEST_DATABASE_EXPECTED_HOST
-  ) {
-    throw new Error(
-      'Configure uma branch Neon isolada em TEST_DATABASE_URL e confirme seu host em TEST_DATABASE_EXPECTED_HOST. Nunca use produção.',
-    );
-  }
-  if (
-    process.env.DATABASE_URL &&
-    new URL(url).hostname.replace('-pooler', '') ===
-      new URL(process.env.DATABASE_URL).hostname.replace('-pooler', '')
-  ) {
-    throw new Error('Testes não podem limpar o banco da aplicação.');
-  }
+  // Validar TODAS as URLs antes de abrir conexão ou limpar qualquer tabela.
+  const { url, appUrl } = require('./validar-banco').carregarConfiguracao();
   const pool = new Pool({ connectionString: url });
   try {
     const hash = await bcrypt.hash('123456', 12);
@@ -52,9 +36,6 @@ module.exports = async function prepararBancoDeTeste() {
   } finally {
     await pool.end();
   }
-  const appUrl = process.env.TEST_APP_DATABASE_URL || url;
-  if (new URL(appUrl).hostname !== process.env.TEST_DATABASE_EXPECTED_HOST)
-    throw new Error('A aplicação de testes deve usar a mesma branch isolada');
   process.env.DATABASE_URL = appUrl;
   process.env.TASKFLOW_PRODUCTION_SECURITY = 'false';
   const directUrl = new URL(appUrl);

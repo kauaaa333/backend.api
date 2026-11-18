@@ -1,0 +1,9 @@
+const { carregarConfiguracao } = require('../../test/validar-banco');
+const { appUrl } = carregarConfiguracao();
+process.env.DATABASE_URL = appUrl;
+const direto = new URL(appUrl);
+direto.hostname = direto.hostname.replace('-pooler.', '.');
+process.env.DIRECT_URL = direto.toString();
+process.env.JWT_SECRET = 'chave-local-exclusiva-dos-testes-de-integracao';
+process.env.AMBIENTE = 'teste';
+process.env.TASKFLOW_PRODUCTION_SECURITY = 'false';
