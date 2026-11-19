@@ -1,5 +1,7 @@
 # TaskFlow API
 
+[![Backend - validação](https://github.com/kauaaa333/backend.api/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/kauaaa333/backend.api/actions/workflows/ci.yml)
+
 Backend do TaskFlow com Node.js, Express, Prisma e PostgreSQL.
 
 [Aplicação](https://task-flow-gamma-inky.vercel.app/) · [Swagger](https://backend-api-black-seven.vercel.app/docs/) · [Frontend](https://github.com/kauaaa333/TaskFlow)
