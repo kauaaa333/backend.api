@@ -63,6 +63,8 @@ Os testes de integração exigem `TEST_DATABASE_URL`, `TEST_APP_DATABASE_URL` e 
 
 O GitHub Actions usa PostgreSQL temporário. A coleção Postman está em `postman/`. O runner `scripts/run-postman.cjs` usa Newman instalado separadamente em `tmp/postman-runner`:
 
+O workflow roda em pushes na `main` e em pull requests. Para consultar o resultado, abra a aba Actions ou clique no selo no início deste README. Antes de mesclar um pull request, confira se a validação do backend terminou com sucesso.
+
 ```sh
 npm install --prefix=tmp/postman-runner --no-save --package-lock=false newman@6.2.3
 node scripts/run-postman.cjs
